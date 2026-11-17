@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Earthquake Triangulation Lab</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#1b2a5e;--muted:#566089;--line:#d6dcf0;--gold:#e8a33d;--onGold:#1b2a5e;--p:#c8553d;--s:#1d7f8c;--sp:#b07800;--ok:#1e7a46;--bad:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1431;--card:#171f45;--ink:#eaf0ff;--muted:#a7b1d6;--line:#2b3668;--p:#ee7a60;--s:#46b8c6;--sp:#e8b84a;--ok:#5ad28b;--bad:#ff8a80}}
+:root[data-theme="dark"]{--bg:#0e1431;--card:#171f45;--ink:#eaf0ff;--muted:#a7b1d6;--line:#2b3668;--p:#ee7a60;--s:#46b8c6;--sp:#e8b84a;--ok:#5ad28b;--bad:#ff8a80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1320px;margin:0 auto;padding:14px 14px 28px}
+h1{font:700 clamp(20px,2.8vw,29px)/1.15 Georgia,"Times New Roman",serif;margin:0 0 2px}
+.sub{margin:0 0 10px;color:var(--muted);font-size:14px}
+.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(340px,.9fr);gap:14px;align-items:start}
+@media (max-width:1020px){.layout{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 2px 10px rgba(27,42,94,.08)}
+.side{display:flex;flex-direction:column;gap:12px}
+h2{font:700 15px/1.2 system-ui,sans-serif;margin:0 0 8px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+button{font:700 14px system-ui,sans-serif;cursor:pointer;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:8px 12px}
+button.primary{background:var(--gold);color:var(--onGold);border:0;padding:11px 16px;font-size:16px;font-weight:800;box-shadow:0 2px 0 rgba(0,0,0,.18)}
+button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.chip{padding:4px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-weight:700;font-size:13px}
+input[type=number]{font:700 16px system-ui,sans-serif;padding:6px 8px;border:2px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:88px}
+input[type=number].wide{width:185px}
+.mapwrap{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+@keyframes quake{0%{transform:translate(0,0)}7%{transform:translate(-8px,3px)}14%{transform:translate(7px,-4px)}21%{transform:translate(-7px,-3px)}28%{transform:translate(6px,4px)}36%{transform:translate(-5px,2px)}46%{transform:translate(5px,-2px)}58%{transform:translate(-3px,2px)}72%{transform:translate(2px,-1px)}86%{transform:translate(-1px,1px)}100%{transform:translate(0,0)}}
+.shake{animation:quake .95s ease-out}
+@keyframes bn{0%{opacity:0;transform:translateX(-50%) scale(.8)}12%{opacity:1;transform:translateX(-50%) scale(1.08)}24%{opacity:1;transform:translateX(-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translateX(-50%) scale(1)}}
+.banner{position:absolute;left:50%;top:16px;transform:translateX(-50%);background:#b3261e;color:#fff;font:800 19px system-ui,sans-serif;letter-spacing:.04em;padding:7px 18px;border-radius:999px;box-shadow:0 3px 10px rgba(0,0,0,.35);pointer-events:none;opacity:0}
+.banner.show{animation:bn 2.4s ease-out}
+@media (prefers-reduced-motion:reduce){.shake{animation:none}}
+canvas{display:block;max-width:100%}#map{touch-action:none;cursor:crosshair}
+.info{font:13px ui-monospace,Menlo,Consolas,monospace;color:var(--muted);padding:4px 2px;min-height:22px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12.5px;color:var(--muted);margin-top:4px}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.tabs{display:flex;gap:6px;margin-bottom:8px}.tabs button{flex:1;border-width:3px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.row label{font-weight:700;font-size:13.5px}
+.small{font-size:13px;color:var(--muted)}.ok{color:var(--ok);font-weight:700}.bad{color:var(--bad);font-weight:700}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}th{font-size:12px;color:var(--muted)}td.n,th.n{text-align:right}
+.msg{font-size:14px;line-height:1.5;margin:6px 0}.hz li{margin:4px 0}.hz{padding-left:18px;margin:6px 0}
+details summary{cursor:pointer;font-weight:700}
+.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:12px;font-weight:800;color:#fff;margin:1px 2px 1px 0}
+.toptabs{display:flex;gap:8px;margin:0 0 12px}.toptabs button{padding:9px 22px;border-radius:999px;font-size:15px}.toptabs button.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
+#wsView .card{margin-bottom:12px}.pts{font-weight:600;font-size:13px;color:var(--muted)}.scrollx{overflow-x:auto}
+.wst{border-collapse:collapse;margin:6px 0}.wst th,.wst td{border:1px solid var(--line);padding:5px 7px;text-align:center;font-size:13.5px}.wst th{background:var(--ink);color:var(--card);font-size:12.5px}
+.wn,.wt,select[data-k]{font:600 14.5px system-ui,sans-serif;padding:5px 6px;border:2px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)}.wn{text-align:center}
+.wa{width:100%;font:15px/1.4 system-ui,sans-serif;padding:7px 9px;border:2px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);resize:vertical;margin:3px 0 10px}
+.wq{display:block;font-weight:700;font-size:14px;margin-top:10px}.wck{display:block;font-size:12.5px;text-align:left;white-space:nowrap}.wck input{margin-right:4px}
+.wplot{display:block;margin:6px 0 10px;border:1px solid var(--line);border-radius:8px;cursor:crosshair;max-width:100%}
+.marks{list-style:none;padding:0;margin:8px 0 0;columns:2;font-size:13.5px}.marks li{margin:2px 0}
+#wsView h3{margin:0 0 4px;font-size:17px}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Earthquake Triangulation Lab</h1>
+  <p class="sub">Use the S − P time at three seismograph stations to find where each earthquake happened, then ask what other hazards it could cause.</p>
+  <div class="toptabs" role="tablist"><button id="tabLab" type="button" class="on">Lab</button><button id="tabWs" type="button">Worksheet</button></div>
+  <div class="layout" id="labView">
+    <section>
+      <div class="bar">
+        <button id="cause" class="primary" type="button">Cause an earthquake</button>
+        <span id="status" class="chip">No earthquake yet</span>
+        <span class="small">Scenario</span><input id="scn" type="number" min="1" max="99" value="1" aria-label="Scenario number"><button id="loadScn" type="button">Load</button>
+        <span style="flex:1"></span>
+        <button id="zin" type="button" title="Zoom in" aria-label="Zoom in">+</button><button id="zout" type="button" title="Zoom out" aria-label="Zoom out">−</button><button id="zreset" type="button">Reset view</button>
+      </div>
+      <div class="mapwrap" id="mapwrap"><canvas id="map" role="img" aria-label="Topographic map with three seismograph stations"></canvas><div class="banner" id="quakeBanner" aria-hidden="true">EARTHQUAKE!</div></div>
+      <div class="info" id="mapinfo">Move the pointer over the map to read position, elevation, and slope.</div>
+      <div class="legend" id="legend"></div>
+      <div class="card" id="cardSeis" style="margin-top:12px">
+        <h2>1. Read the seismograms</h2>
+        <div class="tabs" id="tabs"></div>
+        <canvas id="seis"></canvas>
+        <div class="msg" id="seisMsg">Cause an earthquake, then click a station on the map (or a tab above).</div>
+        <div class="row"><label for="spIn">Your S − P (s)</label><input id="spIn" class="wide" type="number" step="0.1" min="0" placeholder="subtract!" disabled><span id="spVerdict" class="small"></span></div>
+        <div class="row"><label for="dIn">Distance (km)</label><input id="dIn" class="wide" type="number" step="1" min="0" max="450" placeholder="from the graph" disabled><span class="small">or drag the circle’s dot on the map</span></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h2>2. Use the travel-time graph</h2>
+        <canvas id="graph"></canvas>
+        <div class="small">Type your S − P (step 1) and a dashed guide appears. Read the distance where it meets the bottom axis. Move the pointer over the graph for exact values.</div>
+      </div>
+    </section>
+    <aside class="side">
+      <div class="card">
+        <h2>3. Find the epicenter</h2>
+        <div class="bar"><button id="place" type="button" disabled>Place my epicenter</button><button id="check" type="button" disabled>Check my circles</button><button id="reveal" type="button" disabled>Reveal the real epicenter</button><button id="quick" type="button" style="display:none">Quick-plot (skip triangulation)</button></div>
+        <div class="msg" id="epiMsg">Three circles meet at the epicenter. Press <b>Place my epicenter</b> and click the map (or just double-click the map).</div>
+      </div>
+      <div class="card" id="cardHaz" style="display:none">
+        <h2>4. Hazard briefing</h2><div id="hazBody"></div>
+      </div>
+      <div class="card">
+        <h2>5. Earthquake log and hidden geology</h2>
+        <div id="logBody" class="small">No earthquakes located yet.</div>
+        <div class="bar" style="margin-top:8px"><button id="geo" type="button" disabled>Reveal the geology</button><span class="small" id="geoNote"></span></div>
+        <div class="bar" style="margin-top:4px"><button id="clearMap" type="button">Clear all epicenters</button><span class="small">Epicenters you locate stay on the map when you load another scenario.</span></div>
+      </div>
+      <div class="card" id="teacherCard">
+        <button id="tOpen" type="button">🔒 Teacher settings</button>
+        <div id="tPin" style="display:none;margin-top:8px"><label class="small" for="pinIn"><b>Teacher PIN</b></label> <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" maxlength="8" style="width:100px;font:700 16px system-ui"> <button id="pinGo" type="button">Unlock</button> <span id="pinMsg" class="bad small"></span></div>
+        <div id="tBody" style="display:none;margin-top:8px">
+        <div class="row"><label><input type="checkbox" id="oTimes" checked> Label the exact arrival times on seismograms</label></div>
+        <div class="row"><label><input type="checkbox" id="oQuick"> Allow quick-plot from the start</label></div>
+        <div class="row"><label><input type="checkbox" id="oGeo"> Unlock the geology reveal now</label></div>
+        <div class="row"><label><input type="checkbox" id="oDist" checked> Label the distance on the graph guide (uncheck so students read it from the axis)</label></div>
+        <div class="row"><label><input type="checkbox" id="oSum"> Show the hazard summary automatically</label></div>
+        <div class="row"><label>After students submit their worksheet, show them: <select id="oFb"><option value="2">marks and score</option><option value="1">score only</option><option value="0">nothing</option></select></label></div>
+        <div class="small">Quakes 1–6 in every scenario are set up on purpose: 1 felt-only, 2 offshore tsunami case, 3 steep-slope landslide case, 4 river-sediment liquefaction case, 5 deep quake, 6 small offshore quake. Later quakes follow the hidden geology.</div>
+        <div class="small" style="margin-top:8px"><b>Give students these settings:</b> add <b id="tToken">#cfg10100</b> to the end of the page address you share. (A page opened without it uses the defaults.) Loading a new scenario keeps earlier epicenters on the map; use “Clear all epicenters” to start fresh.</div>
+        <div class="bar" style="margin-top:8px"><button id="tLockNow" type="button">Lock settings</button></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+  <div id="wsView" style="display:none"></div>
+</main>
+<script src="config.js"></script>
+<script>
+// ===== Fictional terrain: 400 km (east) x 300 km (north), 1 km grid, fixed seed =====
+const MW = 400, MH = 300, NX = MW + 1, NY = MH + 1;
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function makeNoise(seed) {
+  const r = mulberry32(seed), N = 64, g = new Float32Array(N * N); for (let i = 0; i < g.length; i++) g[i] = r();
+  const sm = t => t * t * (3 - 2 * t);
+  return (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = sm(xf), v = sm(yf);
+    const a = g[(yi & 63) * N + (xi & 63)], b = g[(yi & 63) * N + ((xi + 1) & 63)], c = g[((yi + 1) & 63) * N + (xi & 63)], d = g[((yi + 1) & 63) * N + ((xi + 1) & 63)];
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
+}
+const nz1 = makeNoise(101), nz2 = makeNoise(202), nz3 = makeNoise(303), nz4 = makeNoise(404);
+function fbm(n, x, y, oct) { let s = 0, a = 0.5, f = 1, t = 0; for (let i = 0; i < oct; i++) { s += a * n(x * f, y * f); t += a; a *= 0.5; f *= 2.03; } return s / t; }
+const g1 = (y, c, s) => Math.exp(-((y - c) / s) * ((y - c) / s));
+const smooth = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+function cosTable(tab, d) { if (d <= tab[0][0]) return tab[0][1]; for (let i = 1; i < tab.length; i++) if (d <= tab[i][0]) { const t = (d - tab[i - 1][0]) / (tab[i][0] - tab[i - 1][0]), s = (1 - Math.cos(Math.PI * t)) / 2; return tab[i - 1][1] + (tab[i][1] - tab[i - 1][1]) * s; } return tab[tab.length - 1][1]; }
+// coast: smooth trend + local wiggles, a bay near y = 58 and a cape near y = 242
+function coastS(y) { return 112 + 20 * Math.sin(y / 48 + 0.8) + 9 * Math.sin(y / 19 + 1.9); }
+function coastX(y) { return coastS(y) + 12 * (fbm(nz1, 0.5, y / 26, 3) - 0.5) * 2 + 22 * g1(y, 58, 13) - 26 * g1(y, 242, 15); }
+const TRENCH_OFF = 54;                                                  // trench lies ~54 km off the smooth coast
+const trenchX = y => coastS(y) - TRENCH_OFF;
+const LAND = [[0, 0], [6, 8], [14, 26], [28, 70], [38, 120], [44, 160], [47, 520], [50, 960], [54, 1300], [60, 1450], [70, 1520], [80, 1400], [90, 1180], [96, 900], [100, 560], [104, 300], [110, 215], [124, 190], [150, 200], [190, 230], [230, 330], [270, 520], [320, 690], [380, 760]];
+const SEA = [[0, 0], [6, -25], [14, -70], [22, -125], [30, -700], [38, -2200], [46, -4200], [54, -5300], [62, -4900], [72, -4550], [100, -4400]];
+// river path from the eastern highlands, through a gap in the range, to the coast (mouth computed from the coast)
+const RIVER_CTRL = (() => { const my = 129, mx = coastX(my) + 1; return [[396, 208], [372, 186], [348, 196], [322, 170], [300, 158], [284, 146], [262, 150], [244, 136], [222, 128], [204, 135], [186, 128], [168, 136], [150, 126], [134, 133], [122, 127], [mx, my]]; })();
+const RIVER_PTS = (() => { const P = RIVER_CTRL, out = []; for (let i = 0; i < P.length - 1; i++) { const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)], n = Math.max(2, Math.round(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 2)); for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t; out.push([0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3), 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)]); } } out.push(P[P.length - 1]); return out; })();
+function nearestOnPath(pts, x, y) { let best = 1e9, bt = 0, bi = 0; for (let i = 1; i < pts.length; i++) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy, t = Math.max(0, Math.min(1, ((x - x0) * dx + (y - y0) * dy) / L2)), px = x0 + t * dx, py = y0 + t * dy, d = Math.hypot(x - px, y - py); if (d < best) { best = d; bt = (i - 1 + t) / (pts.length - 1); bi = i; } } return { d: best, t: bt }; }
+function elevRaw(x, y) {
+  const cx = coastX(y), dl = x - cx;
+  if (dl <= 0) {                                                         // sea floor
+    const s = -dl, sd = coastS(y) - x, w = smooth((s - 10) / 20), sb = s * (1 - w) + sd * w;
+    return cosTable(SEA, sb) + 90 * (fbm(nz2, x / 14, y / 14, 3) - 0.5) * smooth((sb - 12) / 16);
+  }
+  const dp = dl + 7 * Math.sin(y / 52 + 1.3);
+  let e = cosTable(LAND, dp);
+  const env = smooth((dp - 38) / 22) * (1 - smooth((dp - 100) / 16));
+  const rid = 1 - Math.abs(2 * fbm(nz3, x / 20, y / 20, 4) - 1);
+  e *= (0.8 + 0.5 * fbm(nz4, 0.3, y / 70, 2));
+  e += env * (rid - 0.55) * 520 + 60 * (fbm(nz2, x / 9, y / 9, 4) - 0.5) * smooth(dp / 30);
+  e += smooth((dp - 200) / 50) * 150 * (fbm(nz3, x / 25, y / 25, 4) - 0.5);
+  return Math.max(0.5, e);
+}
+function elevAt(x, y) {
+  let e = elevRaw(x, y);
+  if (e > 0) {                                                            // carve the river valley
+    const r = nearestOnPath(RIVER_PTS, x, y), dl = x - coastX(y), w = 3.4 + 5 * smooth((dl - 95) / 30);
+    const k = Math.exp(-(r.d / w) * (r.d / w)), bed = 4 + 235 * (1 - r.t) ** 1.2;
+    e = e * (1 - k) + Math.min(e, bed) * k;
+    if (x - coastX(y) < 16 && r.d < 9) e = Math.min(e, 8 + 0.9 * (x - coastX(y)));    // low delta flats at the mouth
+  }
+  return e;
+}
+// ---- DEM grid ----
+const DEM = new Float32Array(NX * NY);
+for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) DEM[j * NX + i] = elevAt(i, j);
+function demAt(x, y) {                                                    // bilinear sample (x east, y north, km)
+  x = Math.max(0, Math.min(MW - 1e-6, x)); y = Math.max(0, Math.min(MH - 1e-6, y));
+  const i = Math.floor(x), j = Math.floor(y), u = x - i, v = y - j, a = DEM[j * NX + i], b = DEM[j * NX + i + 1], c = DEM[(j + 1) * NX + i], d = DEM[(j + 1) * NX + i + 1];
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function gradAt(x, y) { const h = 1.5, gx = (demAt(x + h, y) - demAt(x - h, y)) / (2 * h), gy = (demAt(x, y + h) - demAt(x, y - h)) / (2 * h); return Math.hypot(gx, gy) / 10; }   // percent grade (m per km / 10)
+// ---- named places (positions derived from the terrain) ----
+const mouth = RIVER_PTS[RIVER_PTS.length - 1];
+function steepSite() { let best = null; for (let y = 160; y <= 205; y += 1) for (let x = 120; x <= 260; x += 1) { const e = demAt(x, y); if (e < 650 || e > 1100) continue; const g = gradAt(x, y); if (!best || g > best.g) best = { x, y, g, e }; } return best; }
+const RH_SITE = steepSite();
+const TOWNS = [
+  { id: 'PA', name: 'Port Alder', x: mouth[0] + 2.5, y: mouth[1] + 4, ground: 'river delta sediments', pop: 48000 },
+  { id: 'MA', name: 'Marlow', x: coastX(34) + 4, y: 34, ground: 'coastal terrace (firm)', pop: 6200 },
+  { id: 'SA', name: 'Saltmere', x: coastX(236) + 4, y: 236, ground: 'coastal plain (firm)', pop: 3100 },
+  { id: 'RH', name: 'Redhollow', x: RH_SITE.x, y: RH_SITE.y, ground: 'steep mountain valley', pop: 4500 },
+  { id: 'FE', name: 'Fennmoor', x: 258, y: 144, ground: 'valley floor sediments', pop: 21000 },
+  { id: 'IV', name: 'Ironvale', x: 352, y: 74, ground: 'bedrock hills', pop: 15500 }
+];
+const STATIONS = [
+  { id: 'A', code: 'CWR', name: 'Cape Wren Station', x: coastX(222) + 9, y: 222, color: '#2b6cb0' },
+  { id: 'B', code: 'IRV', name: 'Ironvale Station', x: 338, y: 96, color: '#b83280' },
+  { id: 'C', code: 'MRL', name: 'Marlow Station', x: coastX(44) + 14, y: 44, color: '#2f855a' }
+];
+const FAULT = [[10, 138], [58, 134], [108, 134], [150, 147], [196, 141], [244, 134], [292, 132]].map(([y, off]) => [coastS(y) + off, y]);      // Silver Reach Fault (strike-slip), runs along the valley
+
+// ===== Topographic map renderer (shaded relief + contours + names). Draws into an offscreen canvas at PX pixels per km. =====
+const LAND_C = [[0, [214, 232, 184]], [100, [200, 224, 160]], [300, [224, 230, 170]], [600, [233, 216, 162]], [1000, [218, 192, 144]], [1500, [202, 170, 132]], [2100, [238, 228, 216]]];
+const SEA_C = [[0, [204, 232, 246]], [-100, [182, 219, 240]], [-1000, [146, 194, 227]], [-3000, [108, 163, 207]], [-5500, [74, 124, 180]]];
+function ramp(tab, v, rev) {
+  if (rev) { if (v >= tab[0][0]) return tab[0][1]; for (let i = 1; i < tab.length; i++) if (v >= tab[i][0]) { const t = (v - tab[i - 1][0]) / (tab[i][0] - tab[i - 1][0]), a = tab[i - 1][1], b = tab[i][1]; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; } return tab[tab.length - 1][1]; }
+  if (v <= tab[0][0]) return tab[0][1]; for (let i = 1; i < tab.length; i++) if (v <= tab[i][0]) { const t = (v - tab[i - 1][0]) / (tab[i][0] - tab[i - 1][0]), a = tab[i - 1][1], b = tab[i][1]; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; } return tab[tab.length - 1][1];
+}
+function contourSegs(level) {                                       // marching squares on the 1 km DEM
+  const segs = [];
+  for (let j = 0; j < NY - 1; j++) for (let i = 0; i < NX - 1; i++) {
+    const a = DEM[j * NX + i] - level, b = DEM[j * NX + i + 1] - level, c = DEM[(j + 1) * NX + i + 1] - level, d = DEM[(j + 1) * NX + i] - level;
+    const code = (a > 0 ? 1 : 0) | (b > 0 ? 2 : 0) | (c > 0 ? 4 : 0) | (d > 0 ? 8 : 0); if (code === 0 || code === 15) continue;
+    const L = (v0, v1) => v0 / (v0 - v1);
+    const pts = { bot: [i + L(a, b), j], right: [i + 1, j + L(b, c)], top: [i + L(d, c), j + 1], left: [i, j + L(a, d)] };
+    const add = (p, q) => segs.push([pts[p][0], pts[p][1], pts[q][0], pts[q][1]]);
+    switch (code) { case 1: case 14: add('left', 'bot'); break; case 2: case 13: add('bot', 'right'); break; case 3: case 12: add('left', 'right'); break; case 4: case 11: add('right', 'top'); break;
+      case 6: case 9: add('bot', 'top'); break; case 7: case 8: add('left', 'top'); break; case 5: add('left', 'top'); add('bot', 'right'); break; case 10: add('left', 'bot'); add('right', 'top'); break; }
+  }
+  return segs;
+}
+const PEAKS = [{ name: 'Mount Tarn', x: 170, y: 148 }, { name: 'Kestrel Peak', x: 170, y: 208 }, { name: 'Wren Crown', x: 178, y: 268 }, { name: 'Mount Alder', x: 198, y: 84 }];
+function roadPts() {
+  const cx = coastX, roads = [];
+  roads.push([[TOWNS[2].x, TOWNS[2].y], [cx(200) + 9, 200], [cx(165) + 9, 165], [TOWNS[0].x, TOWNS[0].y], [cx(100) + 10, 100], [cx(70) + 10, 70], [TOWNS[1].x, TOWNS[1].y]]);
+  roads.push([[TOWNS[0].x, TOWNS[0].y], [124, 134], [148, 135], [176, 137], [205, 135], [236, 138], [TOWNS[4].x, TOWNS[4].y]]);
+  roads.push([[TOWNS[4].x, TOWNS[4].y], [290, 118], [322, 94], [TOWNS[5].x, TOWNS[5].y]]);
+  roads.push([[TOWNS[3].x, TOWNS[3].y], [150, 165], [152, 148], [148, 135]]);
+  return roads;
+}
+function renderTopo(cv, PX) {
+  const W = MW * PX, H = MH * PX; cv.width = W; cv.height = H; const ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), d = img.data;
+  const Lx = -0.5, Ly = 0.5, Lz = 0.707, Ln = Math.hypot(Lx, Ly, Lz);
+  for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+    const x = (px + 0.5) / PX, y = MH - (py + 0.5) / PX, e = demAt(x, y), h = 0.8;
+    const gx = (demAt(x + h, y) - demAt(x - h, y)) / (2 * h) / 1000, gy = (demAt(x, y + h) - demAt(x, y - h)) / (2 * h) / 1000, Z = e > 0 ? 3.2 : 1.2;
+    const nx = -gx * Z, ny = -gy * Z, nl = Math.hypot(nx, ny, 1), lam = (nx * Lx + ny * Ly + Lz) / (nl * Ln), f = Math.max(0.6, Math.min(1.22, 1 + 1.15 * (lam - Lz / Ln)));
+    const c = e > 0 ? ramp(LAND_C, e) : ramp(SEA_C, e, true), k = (py * W + px) * 4;
+    d[k] = Math.min(255, c[0] * f); d[k + 1] = Math.min(255, c[1] * f); d[k + 2] = Math.min(255, c[2] * f); d[k + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const X = x => x * PX, Y = y => (MH - y) * PX, line = (segs, color, lw) => { ctx.beginPath(); for (const s of segs) { ctx.moveTo(X(s[0]), Y(s[1])); ctx.lineTo(X(s[2]), Y(s[3])); } ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.stroke(); };
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // sea-floor contours (blue)
+  for (let lv = -500; lv >= -5500; lv -= 500) line(contourSegs(lv), lv % 2000 === 0 ? 'rgba(40,90,150,0.75)' : 'rgba(60,110,170,0.38)', lv % 2000 === 0 ? 0.9 * PX / 2 : 0.55 * PX / 2);
+  // land contours: 200 m interval, index every 1,000 m
+  const labels = [];
+  for (let lv = 200; lv <= 2200; lv += 200) { const segs = contourSegs(lv), idx = lv % 1000 === 0; line(segs, idx ? 'rgba(122,78,36,0.85)' : 'rgba(150,104,58,0.5)', (idx ? 1.0 : 0.6) * PX / 2);
+    if (idx) { let used = []; segs.forEach(s => { const mx = (s[0] + s[2]) / 2, my = (s[1] + s[3]) / 2; if (used.every(u => Math.hypot(u[0] - mx, u[1] - my) > 34) && Math.hypot(s[0] - s[2], s[1] - s[3]) > 0.8) { used.push([mx, my]); labels.push([mx, my, lv]); } }); } }
+  // shoreline
+  line(contourSegs(0), 'rgba(24,70,120,0.95)', 1.5 * PX / 2);
+  // river
+  ctx.strokeStyle = '#3a7fc0'; for (let i = 3; i < RIVER_PTS.length; i += 3) { ctx.lineWidth = (0.9 + 1.9 * i / RIVER_PTS.length) * PX / 2; ctx.beginPath(); ctx.moveTo(X(RIVER_PTS[i - 3][0]), Y(RIVER_PTS[i - 3][1])); for (let k = i - 2; k <= i; k++) ctx.lineTo(X(RIVER_PTS[k][0]), Y(RIVER_PTS[k][1])); ctx.stroke(); }
+  // roads
+  ctx.strokeStyle = 'rgba(184,50,40,0.9)'; ctx.lineWidth = 1.3 * PX / 2; for (const r of roadPts()) { ctx.beginPath(); r.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.stroke(); }
+  const halo = (txt, x, y, size, color, weight, style, rot) => { ctx.save(); ctx.translate(X(x), Y(y)); if (rot) ctx.rotate(rot); ctx.font = (style || 'normal') + ' ' + (weight || 600) + ' ' + size * PX / 3 + 'px Georgia,serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3.2 * PX / 3; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.strokeText(txt, 0, 0); ctx.fillStyle = color; ctx.fillText(txt, 0, 0); ctx.restore(); };
+  labels.forEach(l => halo(String(l[2]), l[0], l[1], 11.5, '#6b4423', 700));
+  // places
+  const off = { PA: [-14, -13, 'right'], MA: [14, -3, 'left'], SA: [14, 0, 'left'], RH: [14, 0, 'left'], FE: [14, -11, 'left'], IV: [-14, -10, 'right'] };
+  PEAKS.forEach(p => { const e = Math.round(demAt(p.x, p.y)); ctx.fillStyle = '#5b3a1e'; ctx.beginPath(); ctx.moveTo(X(p.x), Y(p.y) - 5 * PX / 3); ctx.lineTo(X(p.x) - 4 * PX / 3, Y(p.y) + 3 * PX / 3); ctx.lineTo(X(p.x) + 4 * PX / 3, Y(p.y) + 3 * PX / 3); ctx.fill(); halo(p.name + ' ' + e.toLocaleString() + ' m', p.x + 30, p.y - 4, 12, '#4a2e14', 700, 'italic'); });
+  TOWNS.forEach(t => { const px = X(t.x), py = Y(t.y), s = 5.6 * PX / 3; ctx.fillStyle = '#111'; ctx.fillRect(px - s, py - s, 2 * s, 2 * s); ctx.strokeStyle = '#fff'; ctx.lineWidth = PX / 3; ctx.strokeRect(px - s, py - s, 2 * s, 2 * s);
+    const o = off[t.id] || [10, 0, 'left']; ctx.save(); ctx.font = '700 ' + 15.5 * PX / 3 + 'px Georgia,serif'; ctx.textAlign = o[2]; ctx.textBaseline = 'middle'; ctx.lineWidth = 3.4 * PX / 3; ctx.strokeStyle = 'rgba(255,255,255,0.88)'; ctx.strokeText(t.name, px + o[0] * PX / 3, py + o[1] * PX / 3); ctx.fillStyle = '#111'; ctx.fillText(t.name, px + o[0] * PX / 3, py + o[1] * PX / 3); ctx.restore(); });
+  halo('Meridian Sea', 44, 168, 27, '#2c5f8f', 600, 'italic'); halo('Marlow Bay', coastX(60) - 26, 62, 14, '#2c5f8f', 600, 'italic'); halo('Cape Wren', coastX(242) - 12, 262, 14, '#2c5f8f', 600, 'italic');
+  halo('K E S T R E L   R A N G E', 168, 108, 15, '#6b4423', 700, 'normal', -Math.PI / 2); halo('S I L V E R   R E A C H   V A L L E Y', 236, 218, 14, '#4a6a2a', 700, 'normal', -Math.PI / 2 + 0.06);
+  halo('I R O N V A L E   H I L L S', 342, 148, 14, '#6b4423', 700);
+  return cv;
+}
+
+// ===== Earthquake model: scenarios, travel times, seismograms, hazards =====
+const VP = 8.0, VS = 4.5, K_SP = 1 / VS - 1 / VP;                      // classroom wave speeds (km/s); S-P = 0.0972 s per km
+const SLAB_DIP = 0.5;                                                  // slab depth grows 0.5 km per km east of the trench
+const slabDepthAt = (x, y) => 6 + SLAB_DIP * Math.max(0, x - trenchX(y));
+const hypot = Math.hypot;
+function polyLen(p) { let L = 0; for (let i = 1; i < p.length; i++) L += hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); return L; }
+function polyAt(p, s) { s = Math.max(0, Math.min(polyLen(p), s)); for (let i = 1; i < p.length; i++) { const L = hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); if (s <= L || i === p.length - 1) { const t = L ? s / L : 0; return [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * t, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * t]; } s -= L; } return p[p.length - 1]; }
+function polyNearestS(p, x, y) { let best = 1e9, bs = 0, acc = 0; for (let i = 1; i < p.length; i++) { const [x0, y0] = p[i - 1], [x1, y1] = p[i], dx = x1 - x0, dy = y1 - y0, L = hypot(dx, dy), t = Math.max(0, Math.min(1, ((x - x0) * dx + (y - y0) * dy) / (L * L))), d = hypot(x - (x0 + t * dx), y - (y0 + t * dy)); if (d < best) { best = d; bs = acc + t * L; } acc += L; } return bs; }
+const clampPos = (x, y) => [Math.max(6, Math.min(MW - 6, x)), Math.max(6, Math.min(MH - 6, y))];
+function quakeFor(scn, n) {
+  const rnd = mulberry32((scn * 73856093 ^ n * 19349663 ^ 0x9e3779b9) >>> 0), U = (a, b) => a + (b - a) * rnd(), G = () => (rnd() + rnd() + rnd() - 1.5) / 0.5;
+  const fl = polyLen(FAULT), RH = TOWNS.find(t => t.id === 'RH'), FE = TOWNS.find(t => t.id === 'FE');
+  const gr = (lo, hi) => Math.min(hi, lo - Math.log(1 - rnd() * 0.985) / (Math.LN10 * 0.9));
+  let kind, x, y, M, depth, label;
+  const onFault = s => { const p = polyAt(FAULT, s); return [p[0] + 1.6 * G(), p[1] + 1.6 * G()]; };
+  const onSlab = (dxLo, dxHi, yLo, yHi) => { const yy = U(yLo, yHi), dx = U(dxLo, dxHi); return [trenchX(yy) + dx, yy]; };
+  const cur = { 1: 'fault', 2: 'thrust', 3: 'range', 4: 'faultTown', 5: 'deep', 6: 'offSmall' }[n];
+  if (cur === 'fault') { kind = 'fault'; [x, y] = onFault(U(0.78, 0.93) * fl); M = U(5.2, 5.6); }
+  else if (cur === 'thrust') { kind = 'subduction'; [x, y] = onSlab(10, 36, 70, 230); M = U(6.9, 7.4); }
+  else if (cur === 'range') { kind = 'crustal'; x = RH.x + U(-11, 11); y = RH.y + U(-11, 11); M = U(6.0, 6.4); }
+  else if (cur === 'faultTown') { kind = 'fault'; [x, y] = onFault(polyNearestS(FAULT, FE.x, FE.y) + U(-14, 14)); M = U(6.5, 6.8); }
+  else if (cur === 'deep') { kind = 'subduction'; [x, y] = onSlab(105, 140, 60, 240); M = U(6.2, 6.6); }
+  else if (cur === 'offSmall') { kind = 'subduction'; [x, y] = onSlab(15, 40, 70, 230); M = U(5.3, 5.7); }
+  else {
+    const r = rnd();
+    if (r < 0.34) { kind = 'fault'; [x, y] = onFault(U(0.02, 0.98) * fl); M = gr(4.4, 7.0); }
+    else if (r < 0.78) { kind = 'subduction'; [x, y] = onSlab(4, 150, 10, 290); M = gr(4.5, 7.6); }
+    else if (r < 0.90) { kind = 'crustal'; y = U(15, 285); x = coastX(y) + U(45, 100); M = gr(4.4, 6.6); }
+    else { kind = 'background'; x = U(15, 385); y = U(15, 285); M = U(4.2, 5.4); }
+  }
+  [x, y] = clampPos(x, y);
+  if (kind === 'subduction') depth = Math.max(4, slabDepthAt(x, y) + 2.5 * G()); else if (kind === 'fault') depth = U(6, 13); else depth = U(5, 18);
+  return { n, scn, kind, x, y, M: Math.round(M * 10) / 10, depth: Math.round(depth), origin: Math.round(U(6, 18) * 10) / 10 };
+}
+const stDist = (q, st) => hypot(q.x - st.x, q.y - st.y);
+const arrivals = (q, st) => { const d = stDist(q, st); return { d, tp: q.origin + d / VP, ts: q.origin + d / VS, sp: d * K_SP }; };
+// ----- synthetic seismogram (20 samples per second, 130 s) -----
+const SEIS_T = 130, SEIS_HZ = 20;
+function seismogram(q, st, idx) {
+  const a = arrivals(q, st), rnd = mulberry32((q.scn * 7919 + q.n * 104729 + idx * 1299709) >>> 0), N = SEIS_T * SEIS_HZ, y = new Float32Array(N), nz = 0.010 + 0.006 * Math.max(0, 6 - q.M);
+  const pa = 0.24 + 0.05 * rnd(), ph = rnd() * 6.28, sh = rnd() * 6.28, fP = 2.3 + 0.5 * rnd(), fS = 1.2 + 0.3 * rnd();
+  let lowF = 0.35 + 0.1 * rnd(), lowP = rnd() * 6.28, smooth1 = 0;
+  for (let i = 0; i < N; i++) {
+    const t = i / SEIS_HZ; let v = 0;
+    smooth1 = 0.6 * smooth1 + 0.4 * (rnd() - 0.5); v += nz * (smooth1 * 3 + (rnd() - 0.5)) + 0.004 * Math.sin(2 * Math.PI * lowF * t + lowP);
+    if (t >= a.tp) { const u = t - a.tp; v += pa * (1 - Math.exp(-u / 0.25)) * Math.exp(-u / 6) * Math.sin(2 * Math.PI * fP * u + ph); }
+    if (t >= a.ts) { const u = t - a.ts; v += (1 - Math.exp(-u / 0.35)) * Math.exp(-u / 13) * (Math.sin(2 * Math.PI * fS * u + sh) + 0.35 * Math.sin(2 * Math.PI * fS * 1.9 * u + sh * 2)); }
+    else if (t >= a.tp) { const u = t - a.tp; v += 0.05 * Math.exp(-u / 20) * Math.sin(2 * Math.PI * 0.8 * u + sh); }
+    y[i] = v;
+  }
+  let mx = 0; for (let i = 0; i < N; i++) mx = Math.max(mx, Math.abs(y[i])); for (let i = 0; i < N; i++) y[i] /= mx;
+  return y;
+}
+// ----- hazards -----
+const soilBoost = g => /delta/.test(g) ? 0.8 : /sediments/.test(g) ? 0.6 : /bedrock/.test(g) ? -0.2 : 0;
+const mmiAt = (M, r, boost) => Math.max(1, Math.min(10, 1.5 * M - 3.2 * Math.log10(r + 10) + 1.6 + (boost || 0)));
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+function damageWord(i) { return i < 4 ? 'barely felt' : i < 5.5 ? 'felt; little damage' : i < 6.5 ? 'slight damage' : i < 7.5 ? 'moderate damage' : 'heavy damage'; }
+function shoreTarget(tx, ty) {                                       // nearest open-water point to a coastal town
+  for (let r = 1; r <= 12; r += 1) for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12, x = tx + r * Math.cos(a), y = ty + r * Math.sin(a); if (x > 0 && y > 0 && x < MW - 1 && y < MH - 1 && demAt(x, y) < -8) return [x, y]; }
+  return null;
+}
+function tsunamiPath(x0, y0, tx, ty) {                               // epicenter -> shoreline: speed = sqrt(g * depth)
+  const tg = shoreTarget(tx, ty); if (!tg) return { minutes: 0, seaKm: 0, avgDepth: 0, blocked: true, landKm: 99 };
+  const L = hypot(tg[0] - x0, tg[1] - y0), n = Math.max(2, Math.ceil(L)), dl = L / n; let time = 0, sea = 0, depthSum = 0, cnt = 0, landKm = 0;
+  for (let k = 0; k < n; k++) { const f = (k + 0.5) / n, e = demAt(x0 + (tg[0] - x0) * f, y0 + (tg[1] - y0) * f);
+    if (e > -5) { landKm += dl; time += dl * 1000 / Math.sqrt(9.81 * 25); continue; }
+    const h = Math.max(25, -e); time += dl * 1000 / Math.sqrt(9.81 * h); sea += dl; depthSum += h; cnt++; }
+  const vEff = L * 1000 / time;                                      // speed that reproduces the travel time exactly
+  return { minutes: time / 60, seaKm: L, avgDepth: vEff * vEff / 9.81, blocked: landKm > 6, landKm };
+}
+function analyze(q) {
+  const e = demAt(q.x, q.y), offshore = e < 0, grade = gradAt(q.x, q.y), res = { offshore, elev: e, grade, towns: [], lines: [], tsunami: 'none', landslideEpic: false, steepFrac: 0 };
+  let steep = 0, tot = 0; for (let dy = -15; dy <= 15; dy += 3) for (let dx = -15; dx <= 15; dx += 3) { if (hypot(dx, dy) > 15) continue; const xx = q.x + dx, yy = q.y + dy; if (xx < 0 || yy < 0 || xx > MW - 1 || yy > MH - 1 || demAt(xx, yy) <= 0) continue; tot++; if (gradAt(xx, yy) >= 15) steep++; }
+  res.steepFrac = tot ? steep / tot : 0;
+  if (!offshore && q.M >= 5.5 && (grade >= 15 || res.steepFrac >= 0.15)) res.landslideEpic = true;
+  res.tsunami = (offshore && q.depth <= 50 && q.M >= 6.8) ? 'likely' : (offshore && q.depth <= 50 && q.M >= 6.4) ? 'small' : 'none';
+  TOWNS.forEach(t => { const r = hypot(q.x - t.x, q.y - t.y), te = demAt(t.x, t.y), tg = gradAt(t.x, t.y), I = mmiAt(q.M, r, soilBoost(t.ground));
+    const o = { id: t.id, name: t.name, r, ground: t.ground, elev: te, grade: tg, I, coastal: te < 20 && /delta|coastal/.test(t.ground), flags: [] };
+    if (tg >= 15 && I >= 6) o.flags.push('landslide'); else if (tg >= 15 && I >= 5) o.flags.push('landslide (possible)');
+    if (/sediments/.test(t.ground) && I >= 7) o.flags.push('liquefaction'); else if (/sediments/.test(t.ground) && I >= 6) o.flags.push('liquefaction (possible)');
+    if (I >= 7.5) o.flags.push('heavy damage'); else if (I >= 6.5) o.flags.push('moderate damage'); else if (I >= 5.5) o.flags.push('slight damage');
+    if (offshore && o.coastal) { o.tsu = tsunamiPath(q.x, q.y, t.x, t.y); if (res.tsunami !== 'none') o.flags.unshift((res.tsunami === 'likely' ? 'tsunami' : 'small tsunami') + (o.tsu.blocked ? ' (sheltered by land)' : '')); }
+    res.towns.push(o); });
+  return res;
+}
+
+(function () {
+'use strict';
+const $ = id => document.getElementById(id), PX = 3, g2 = Math.hypot;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const S = { scn: 1, n: 0, q: null, revealed: false, hist: [], st: STATIONS.map(s => Object.assign({}, s, { r: null, sp: '' })), sel: 0, my: null, place: false, geo: false, sum: false, an: null, seis: null, drag: null, seisHover: null, gHover: null,
+  opt: { times: true, dist: true, quick: false, unlock: false, autosum: false, fb: 2 }, view: { z: 1, x0: 0, y0: 0 } };
+const mapC = $('map'), mctx = mapC.getContext('2d'), seisC = $('seis'), sctx = seisC.getContext('2d'), gC = $('graph'), gctx = gC.getContext('2d');
+const DEPTH_COL = d => d < 20 ? '#d7191c' : d < 40 ? '#f28e2b' : d < 60 ? '#7b3294' : '#1f4e9c';
+let topo = null, dpr = 1, ML = 46, MT = 10, MR = 12, MB = 34, MWp = 800, MHp = 600, BASE = 2;
+const fmt1 = v => v.toFixed(1), num = v => { const x = parseFloat(v); return isNaN(x) ? null : x; };
+function sizeCanvas(c, w, h) { dpr = window.devicePixelRatio || 1; c.style.width = w + 'px'; c.style.height = h + 'px'; c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+function txt(ctx, s, x, y, size, color, align, weight, halo) { ctx.font = (weight || 700) + ' ' + size + 'px system-ui,-apple-system,Segoe UI,sans-serif'; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle'; if (halo !== false) { ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText(s, x, y); } ctx.fillStyle = color; ctx.fillText(s, x, y); }
+function star(ctx, x, y, r, fill, stroke) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.42 : r; ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a)); } ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = stroke; ctx.stroke(); }
+
+// ---------- map view ----------
+const zs = () => BASE * S.view.z;
+function toS(x, y) { const s = zs(); return [ML + (x - S.view.x0) * s, MT + MHp - (y - S.view.y0) * s]; }
+function toW(px, py) { const s = zs(); return [S.view.x0 + (px - ML) / s, S.view.y0 + (MT + MHp - py) / s]; }
+function clampView() { const z = S.view.z; S.view.x0 = Math.max(0, Math.min(MW - MW / z, S.view.x0)); S.view.y0 = Math.max(0, Math.min(MH - MH / z, S.view.y0)); }
+function zoomAt(px, py, f) { const [wx, wy] = toW(px, py); S.view.z = Math.max(1, Math.min(5, S.view.z * f)); const s = zs(); S.view.x0 = wx - (px - ML) / s; S.view.y0 = wy - (MT + MHp - py) / s; clampView(); drawMap(); }
+function layoutAll() {
+  const w = Math.max(320, $('mapwrap').clientWidth || 900); MWp = w - ML - MR; BASE = MWp / MW; MHp = Math.round(MH * BASE); sizeCanvas(mapC, w, MHp + MT + MB); clampView();
+  const sw = Math.max(280, (seisC.parentElement.clientWidth || 380) - 28); sizeCanvas(seisC, sw, Math.round(Math.max(190, Math.min(250, sw * 0.26)))); const gw = Math.max(280, (gC.parentElement.clientWidth || 380) - 28); sizeCanvas(gC, gw, Math.max(250, Math.round(gw * 0.45))); drawAll();
+}
+function handleAngle(s) { const c = toS(s.x, s.y), rp = s.r * zs(); for (const a of [-0.6, -1.0, -0.2, 0.4, 1.0, 2.2, 3.0, -2.2, -3.0, 1.6, -1.6]) { const x = c[0] + rp * Math.cos(a), y = c[1] + rp * Math.sin(a); if (x > ML + 22 && x < ML + MWp - 74 && y > MT + 16 && y < MT + MHp - 16) return a; } return -0.6; }
+// ---------- drawing the map ----------
+function drawGeology(ctx) {
+  const ink = '#2b1b5a', pts = []; for (let y = 0; y <= MH; y += 4) pts.push([trenchX(y), y]);
+  ctx.save(); ctx.lineJoin = 'round';
+  [20, 40, 60, 80].forEach(D => { const xs = (D - 6) / SLAB_DIP; ctx.beginPath(); let first = true; for (let y = 0; y <= MH; y += 4) { const p = toS(trenchX(y) + xs, y); first ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]); first = false; } ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(70,50,140,.75)'; ctx.lineWidth = 1.6; ctx.stroke(); ctx.setLineDash([]); const yy = { 20: 270, 40: 240, 60: 210, 80: 180 }[D], lp = toS(trenchX(yy) + xs, yy); txt(ctx, D + ' km deep', lp[0] + 5, lp[1], 11.5, '#46328c', 'left', 800); });
+  ctx.beginPath(); pts.forEach((p, i) => { const s = toS(p[0], p[1]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.strokeStyle = ink; ctx.lineWidth = 3.2; ctx.stroke();
+  for (let y = 6; y < MH; y += 12) { const a = toS(trenchX(y), y), b = toS(trenchX(y + 4), y + 4), dx = b[0] - a[0], dy = b[1] - a[1], L = g2(dx, dy) || 1, nx = dy / L, ny = -dx / L, k = 7; ctx.beginPath(); ctx.moveTo(a[0] - dx / L * 5, a[1] - dy / L * 5); ctx.lineTo(a[0] + dx / L * 5, a[1] + dy / L * 5); ctx.lineTo(a[0] + nx * k, a[1] + ny * k); ctx.closePath(); ctx.fillStyle = ink; ctx.fill(); }
+  const tl = toS(trenchX(100), 100); txt(ctx, 'Meridian Trench', tl[0] + 9, tl[1] - 8, 12, ink, 'left', 800); txt(ctx, '(subduction zone)', tl[0] + 9, tl[1] + 8, 11.5, ink, 'left', 700);
+  ctx.beginPath(); FAULT.forEach((p, i) => { const s = toS(p[0], p[1]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3.4; ctx.stroke();
+  [0.3, 0.7].forEach(f => { const m = polyAt(FAULT, polyLen(FAULT) * f), m2 = polyAt(FAULT, polyLen(FAULT) * f + 4), a = toS(m[0], m[1]), b = toS(m2[0], m2[1]), dx = b[0] - a[0], dy = b[1] - a[1], L = g2(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+    [[1, 1], [-1, -1]].forEach(([side, dir]) => { const sx = a[0] + nx * 11 * side - ux * 13 * dir, sy = a[1] + ny * 11 * side - uy * 13 * dir, ex = a[0] + nx * 11 * side + ux * 13 * dir, ey = a[1] + ny * 11 * side + uy * 13 * dir; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - ux * 7 * dir + nx * 4, ey - uy * 7 * dir + ny * 4); ctx.lineTo(ex - ux * 7 * dir - nx * 4, ey - uy * 7 * dir - ny * 4); ctx.closePath(); ctx.fillStyle = '#b3261e'; ctx.fill(); }); });
+  const fp = toS(FAULT[2][0], FAULT[2][1]); txt(ctx, 'Silver Reach Fault (strike-slip)', fp[0] + 16, fp[1] - 22, 12, '#b3261e', 'left', 800);
+  ctx.restore();
+}
+function drawMap() {
+  const ctx = mctx; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, mapC.width, mapC.height); const z = S.view.z, vw = MW / z, vh = MH / z, ink = css('--ink');
+  ctx.save(); ctx.beginPath(); ctx.rect(ML, MT, MWp, MHp); ctx.clip();
+  if (topo) ctx.drawImage(topo, S.view.x0 * PX, (MH - (S.view.y0 + vh)) * PX, vw * PX, vh * PX, ML, MT, MWp, MHp); else { ctx.fillStyle = '#dfe9ef'; ctx.fillRect(ML, MT, MWp, MHp); txt(ctx, 'Drawing the map…', ML + MWp / 2, MT + MHp / 2, 18, '#1b2a5e', 'center', 700, false); }
+  if (S.geo) drawGeology(ctx);
+  S.hist.forEach(h => { const p = toS(h.x, h.y), r = 2.6 + 2.2 * (h.M - 4); ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7); ctx.fillStyle = DEPTH_COL(h.depth); ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#fff'; ctx.stroke(); });
+  S.st.forEach((s, i) => { if (s.r == null || !S.q) return; const c = toS(s.x, s.y), rp = s.r * zs(); ctx.beginPath(); ctx.arc(c[0], c[1], rp, 0, 7); ctx.fillStyle = s.color + '14'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = s.color; ctx.stroke();
+    const ha = handleAngle(s), hp = [c[0] + rp * Math.cos(ha), c[1] + rp * Math.sin(ha)]; ctx.beginPath(); ctx.arc(hp[0], hp[1], 7, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = s.color; ctx.stroke(); txt(ctx, s.id + ': ' + Math.round(s.r) + ' km', hp[0] + 11, hp[1] - 9, 12, s.color, 'left', 800); });
+  if (S.my) { const p = toS(S.my.x, S.my.y); ctx.beginPath(); ctx.arc(p[0], p[1], 7, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fill(); ctx.lineWidth = 2.6; ctx.strokeStyle = '#111'; ctx.stroke(); ctx.beginPath(); ctx.moveTo(p[0] - 13, p[1]); ctx.lineTo(p[0] + 13, p[1]); ctx.moveTo(p[0], p[1] - 13); ctx.lineTo(p[0], p[1] + 13); ctx.stroke(); txt(ctx, 'My epicenter', p[0] + 14, p[1] + 16, 12, '#111', 'left', 800); }
+  if (S.q && S.revealed) { const p = toS(S.q.x, S.q.y); if (S.my) { const m = toS(S.my.x, S.my.y); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#111'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(m[0], m[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); ctx.setLineDash([]); } star(ctx, p[0], p[1], 15, '#ffd43b', '#111'); txt(ctx, 'Quake ' + S.q.n + ': M' + S.q.M + ', ' + S.q.depth + ' km deep', p[0] + 18, p[1] - 16, 12.5, '#111', 'left', 800); }
+  S.st.forEach((s, i) => { const p = toS(s.x, s.y); ctx.beginPath(); ctx.moveTo(p[0], p[1] - 12); ctx.lineTo(p[0] - 11, p[1] + 8); ctx.lineTo(p[0] + 11, p[1] + 8); ctx.closePath(); ctx.fillStyle = s.color; ctx.fill(); ctx.lineWidth = i === S.sel ? 3.4 : 2; ctx.strokeStyle = i === S.sel ? '#111' : '#fff'; ctx.stroke(); txt(ctx, s.id + ' · ' + s.code, p[0] + 14, p[1] - 6, 12.5, s.color, 'left', 800); });
+  // station pings: all three stations ring at once when a quake strikes (gives nothing away about where it was)
+  if (S.ping) { const pf = (performance.now() - S.ping) / 1500; if (pf >= 0 && pf < 1) S.st.forEach(s => { const c0 = toS(s.x, s.y); for (let k = 0; k < 2; k++) { const f = pf - k * 0.18; if (f <= 0) continue; ctx.beginPath(); ctx.arc(c0[0], c0[1], 8 + f * 75, 0, 7); ctx.globalAlpha = 1 - f; ctx.lineWidth = 3.2; ctx.strokeStyle = s.color; ctx.stroke(); ctx.globalAlpha = 1; } }); }
+  // scale bar, north arrow, note
+  const bl = 50 * zs(), bx = ML + 14, by = MT + MHp - 20; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillRect(bx - 8, by - 20, bl + 56, 34); ctx.fillStyle = '#111'; ctx.fillRect(bx, by, bl / 2, 5); ctx.fillStyle = '#fff'; ctx.fillRect(bx + bl / 2, by, bl / 2, 5); ctx.lineWidth = 1.2; ctx.strokeStyle = '#111'; ctx.strokeRect(bx, by, bl, 5); txt(ctx, '0', bx, by - 8, 11, '#111', 'center', 700, false); txt(ctx, '50 km', bx + bl + 4, by + 2, 11, '#111', 'left', 700, false);
+  const nx = ML + MWp - 24, ny = MT + 40; ctx.beginPath(); ctx.moveTo(nx, ny - 22); ctx.lineTo(nx - 8, ny + 4); ctx.lineTo(nx, ny - 2); ctx.lineTo(nx + 8, ny + 4); ctx.closePath(); ctx.fillStyle = '#111'; ctx.fill(); txt(ctx, 'N', nx, ny - 31, 13, '#111', 'center', 800);
+  ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.fillRect(ML + MWp - 152, MT + MHp - 24, 150, 20); txt(ctx, 'Contour interval 200 m', ML + MWp - 77, MT + MHp - 14, 11, '#333', 'center', 600, false);
+  ctx.restore();
+  // neatline and ticks (km)
+  ctx.lineWidth = 1.6; ctx.strokeStyle = ink; ctx.strokeRect(ML, MT, MWp, MHp); ctx.fillStyle = ink;
+  for (let x = Math.ceil(S.view.x0 / 10) * 10; x <= S.view.x0 + vw; x += 10) { const p = toS(x, 0)[0], major = x % 50 === 0; ctx.beginPath(); ctx.moveTo(p, MT + MHp); ctx.lineTo(p, MT + MHp + (major ? 8 : 4)); ctx.stroke(); if (major) txt(ctx, String(x), p, MT + MHp + 19, 11.5, ink, 'center', 700, false); }
+  for (let y = Math.ceil(S.view.y0 / 10) * 10; y <= S.view.y0 + vh; y += 10) { const p = toS(0, y)[1], major = y % 50 === 0; ctx.beginPath(); ctx.moveTo(ML, p); ctx.lineTo(ML - (major ? 8 : 4), p); ctx.stroke(); if (major) txt(ctx, String(y), ML - 11, p, 11.5, ink, 'right', 700, false); }
+  txt(ctx, 'km east →', ML + MWp - 4, MT + MHp + 26, 11, css('--muted'), 'right', 600, false); txt(ctx, 'km north ↑', 4, MT + 8, 11, css('--muted'), 'left', 600, false);
+}
+// ---------- seismogram ----------
+function drawSeis() {
+  const c = seisC, ctx = sctx, w = c.width / dpr, h = c.height / dpr, L = 34, R = 8, T = 22, B = 32, pw = w - L - R, ph = h - T - B; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = css('--card'); ctx.fillRect(0, 0, w, h); const ink = css('--ink'), mu = css('--muted'), X = t => L + t / SEIS_T * pw;
+  for (let t = 0; t <= SEIS_T; t += 2) { ctx.strokeStyle = t % 10 === 0 ? 'rgba(120,130,170,.45)' : 'rgba(120,130,170,.16)'; ctx.lineWidth = t % 10 === 0 ? 1 : 0.7; ctx.beginPath(); ctx.moveTo(X(t), T); ctx.lineTo(X(t), T + ph); ctx.stroke(); if (t % 10 === 0) txt(ctx, String(t), X(t), T + ph + 12, 10.5, mu, 'center', 600, false); }
+  ctx.strokeStyle = 'rgba(120,130,170,.4)'; ctx.beginPath(); ctx.moveTo(L, T + ph / 2); ctx.lineTo(L + pw, T + ph / 2); ctx.stroke(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2; ctx.strokeRect(L, T, pw, ph);
+  txt(ctx, 'seconds since the recording began', L + pw / 2, h - 5, 11, mu, 'center', 600, false);
+  if (!S.q || !S.seis) { txt(ctx, 'No earthquake yet', L + pw / 2, T + ph / 2, 15, mu, 'center', 700, false); return; }
+  const st = S.st[S.sel], a = arrivals(S.q, st), y = S.seis[S.sel]; txt(ctx, 'Station ' + st.id + ' · ' + st.code + ' (' + st.name + ')', L, 10, 12.5, st.color, 'left', 800, false);
+  ctx.beginPath(); const N = y.length;
+  for (let px = 0; px < pw; px++) { const i0 = Math.floor(px / pw * N), i1 = Math.max(i0 + 1, Math.floor((px + 1) / pw * N)); let mn = 9, mx = -9; for (let i = i0; i < i1 && i < N; i++) { if (y[i] < mn) mn = y[i]; if (y[i] > mx) mx = y[i]; } const xx = L + px + 0.5, y1 = T + ph / 2 - mx * ph * 0.46, y2 = T + ph / 2 - mn * ph * 0.46; ctx.moveTo(xx, y1); ctx.lineTo(xx, y2); }
+  ctx.strokeStyle = ink; ctx.lineWidth = 1.2; ctx.stroke();
+  const arrow = (t, col, label, side) => { const x = X(t); ctx.beginPath(); ctx.moveTo(x, T + 4); ctx.lineTo(x - 5, T - 5); ctx.lineTo(x + 5, T - 5); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, T + 4); ctx.lineTo(x, T + ph); ctx.stroke(); ctx.setLineDash([]); txt(ctx, label, x + side * 7, T + 10, 12, col, side > 0 ? 'left' : 'right', 800, false); };
+  arrow(a.tp, css('--p'), S.opt.times ? 'P ' + fmt1(a.tp) + ' s' : 'P', -1); arrow(a.ts, css('--s'), S.opt.times ? 'S ' + fmt1(a.ts) + ' s' : 'S', 1);
+  if (S.seisHover != null) { const hx = Math.max(L, Math.min(L + pw, S.seisHover)), t = (hx - L) / pw * SEIS_T; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, T); ctx.lineTo(hx, T + ph); ctx.stroke(); txt(ctx, 't = ' + fmt1(t) + ' s', Math.min(hx + 4, L + pw - 56), T + ph - 10, 11.5, '#000', 'left', 800); }
+}
+// ---------- travel-time graph ----------
+function drawGraph() {
+  const c = gC, ctx = gctx, w = c.width / dpr, h = c.height / dpr, L = 40, R = 10, T = 12, B = 34, pw = w - L - R, ph = h - T - B, DM = 420, TM = 100; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = css('--card'); ctx.fillRect(0, 0, w, h);
+  const X = d => L + d / DM * pw, Y = t => T + ph - t / TM * ph, ink = css('--ink'), mu = css('--muted');
+  for (let d = 0; d <= DM; d += 10) { const maj = d % 50 === 0; ctx.strokeStyle = maj ? 'rgba(90,100,150,.7)' : 'rgba(90,100,150,.32)'; ctx.lineWidth = maj ? 1.2 : 0.8; ctx.beginPath(); ctx.moveTo(X(d), T); ctx.lineTo(X(d), T + ph); ctx.stroke(); if (maj) txt(ctx, String(d), X(d), T + ph + 12, 10.5, mu, 'center', 600, false); }
+  for (let t = 0; t <= TM; t += 2) { const maj = t % 10 === 0; ctx.strokeStyle = maj ? 'rgba(90,100,150,.7)' : 'rgba(90,100,150,.28)'; ctx.lineWidth = maj ? 1.2 : 0.8; ctx.beginPath(); ctx.moveTo(L, Y(t)); ctx.lineTo(L + pw, Y(t)); ctx.stroke(); if (maj) txt(ctx, String(t), L - 5, Y(t), 10.5, mu, 'right', 600, false); }
+  ctx.strokeStyle = ink; ctx.lineWidth = 1.3; ctx.strokeRect(L, T, pw, ph); txt(ctx, 'distance from the epicenter (km)', L + pw / 2, h - 6, 11, mu, 'center', 600, false); ctx.save(); ctx.translate(11, T + ph / 2); ctx.rotate(-Math.PI / 2); txt(ctx, 'travel time (s)', 0, 0, 11, mu, 'center', 600, false); ctx.restore();
+  const line = (k, col, lw, dash) => { ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(DM), Y(DM * k)); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]); };
+  line(1 / VP, css('--p'), 2.6); line(1 / VS, css('--s'), 2.6); line(K_SP, css('--sp'), 3.4);
+  txt(ctx, 'S wave', X(250), Y(250 / VS) - 9, 12, css('--s'), 'right', 800, false); txt(ctx, 'P wave', X(330), Y(330 / VP) - 9, 12, css('--p'), 'center', 800, false); txt(ctx, 'S − P', X(70), Y(70 * K_SP) + 15, 12, css('--sp'), 'center', 800, false);
+  const st = S.st[S.sel], sp = num(st.sp);
+  if (S.q && sp != null && sp > 0 && sp <= TM) { const d = sp / K_SP; ctx.strokeStyle = st.color; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(L, Y(sp)); ctx.lineTo(Math.min(L + pw, X(d)), Y(sp)); if (d <= DM) ctx.lineTo(X(d), T + ph); ctx.stroke(); ctx.setLineDash([]); if (d <= DM) { ctx.beginPath(); ctx.arc(X(d), Y(sp), 5, 0, 7); ctx.fillStyle = st.color; ctx.fill(); if (S.opt.dist) txt(ctx, 'distance ≈ ' + Math.round(d) + ' km', Math.min(X(d) + 9, L + pw - 136), Math.min(T + ph - 12, Y(sp) + 26), 13, st.color, 'left', 800); } }
+  if (S.gHover != null) { const hd = Math.max(0, Math.min(DM, (S.gHover - L) / pw * DM)); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(hd), T); ctx.lineTo(X(hd), T + ph); ctx.stroke(); const s = ['d = ' + Math.round(hd) + ' km', 'P  ' + fmt1(hd / VP) + ' s', 'S  ' + fmt1(hd / VS) + ' s', 'S − P  ' + fmt1(hd * K_SP) + ' s'], bx = hd > DM * 0.55 ? X(hd) - 98 : X(hd) + 8; ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.fillRect(bx, T + 4, 90, 58); ctx.strokeStyle = '#888'; ctx.strokeRect(bx, T + 4, 90, 58); s.forEach((t, i) => txt(ctx, t, bx + 6, T + 15 + i * 13.5, 11.5, '#111', 'left', i ? 700 : 800, false)); }
+}
+function drawAll() { drawMap(); drawSeis(); drawGraph(); }
+// ---------- panels ----------
+const located = () => S.hist.filter(h => !h.quick && h.err != null && h.err <= 15 && h.scn === S.scn).length;
+function select(i) { S.sel = i; refreshStations(); drawAll(); }
+function refreshStations() {
+  const tabs = $('tabs'); tabs.innerHTML = '';
+  S.st.forEach((s, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = s.id + ' · ' + s.code; b.style.borderColor = s.color; if (i === S.sel) { b.style.background = s.color; b.style.color = '#fff'; } b.addEventListener('click', () => select(i)); tabs.appendChild(b); });
+  const st = S.st[S.sel], on = !!S.q && !S.revealed; $('spIn').disabled = !on; $('dIn').disabled = !on; $('spIn').value = st.sp; $('dIn').value = st.r == null ? '' : Math.round(st.r);
+  if (!S.q) $('seisMsg').textContent = 'Cause an earthquake, then click a station on the map (or a tab above).';
+  else { const a = arrivals(S.q, st); $('seisMsg').innerHTML = S.opt.times ? 'The <b style="color:var(--p)">P wave</b> arrives at <b>' + fmt1(a.tp) + ' s</b> and the <b style="color:var(--s)">S wave</b> at <b>' + fmt1(a.ts) + ' s</b>. Now subtract to find the S − P time.' : 'Find where the <b style="color:var(--p)">P</b> and <b style="color:var(--s)">S</b> waves begin. Move the pointer over the graph to read the time.'; }
+  verdict();
+}
+function verdict() {
+  const st = S.st[S.sel], v = num(st.sp), el = $('spVerdict'); if (!S.q || v == null) { el.textContent = ''; el.className = 'small'; return; }
+  const tol = S.opt.times ? 0.15 : 0.8, ok = Math.abs(v - arrivals(S.q, st).sp) <= tol; el.textContent = ok ? '✓ correct subtraction' : '✗ check your subtraction (S − P)'; el.className = ok ? 'ok' : 'bad';
+}
+function refreshStatus() {
+  const q = S.q, active = !!q && !S.revealed;
+  $('status').textContent = !q ? 'No earthquake yet' : active ? 'Quake #' + q.n + ' · locate it!' : 'Quake #' + q.n + ' · located';
+  $('cause').disabled = active; $('place').disabled = !active; $('check').disabled = !active; $('reveal').disabled = !active; $('place').classList.toggle('on', S.place);
+  $('quick').style.display = (active && (S.opt.quick || located() >= 4)) ? '' : 'none';
+  const canGeo = S.opt.unlock || S.hist.length >= 10; $('geo').disabled = !canGeo; $('geo').textContent = S.geo ? 'Hide the geology' : 'Reveal the geology';
+  $('geoNote').textContent = canGeo ? 'Look at the pattern of epicenters first, then check your ideas.' : 'Locate ' + (10 - S.hist.length) + ' more earthquake' + (10 - S.hist.length === 1 ? '' : 's') + ' to unlock.';
+}
+function say(html) { $('epiMsg').innerHTML = html; }
+function cause() {
+  if (S.q && !S.revealed) return; S.n++; S.q = quakeFor(S.scn, S.n); S.revealed = false; S.my = null; S.place = false; S.an = null; S.sum = S.opt.autosum; S.st.forEach(s => { s.r = null; s.sp = ''; });
+  S.seis = S.st.map((s, i) => seismogram(S.q, s, i)); S.sel = 0; $('cardHaz').style.display = 'none'; say('An earthquake just happened somewhere in the region! Click each station, find S − P, and use the graph to size each circle.'); refreshStations(); refreshStatus(); drawAll(); renderLog(); shakeMap();
+}
+function shakeMap() {
+  const w = $('mapwrap'), b = $('quakeBanner'); w.classList.remove('shake'); b.classList.remove('show'); void w.offsetWidth; w.classList.add('shake'); b.classList.add('show');
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  S.ping = performance.now(); const loop = () => { if (performance.now() - S.ping < 1500) { drawMap(); requestAnimationFrame(loop); } else { S.ping = 0; drawMap(); } }; requestAnimationFrame(loop);
+}
+function reveal(quick) {
+  if (!S.q || S.revealed) return; const q = S.q; S.revealed = true; S.place = false; let err = null; if (!quick && S.my) err = g2(S.my.x - q.x, S.my.y - q.y);
+  S.hist.push({ scn: q.scn, n: q.n, x: q.x, y: q.y, M: q.M, depth: q.depth, kind: q.kind, err, quick: !!quick }); S.an = analyze(q); if (S.opt.autosum) S.sum = true;
+  let m = 'The real epicenter is marked with a star (x ' + q.x.toFixed(0) + ', y ' + q.y.toFixed(0) + ' km). ';
+  if (quick) m += 'Quick-plotted.'; else if (err == null) m += 'You did not place an epicenter this time.'; else m += 'Your estimate was <b>' + fmt1(err) + ' km</b> away: ' + (err < 5 ? '<span class="ok">excellent!</span>' : err <= 15 ? '<span class="ok">good.</span>' : '<span class="bad">not quite. Recheck each S − P, distance, and circle.</span>');
+  if (located() === 4 && !quick) m += ' <b>Quick-plot is now unlocked</b> so you can add more epicenters faster.';
+  say(m); $('cardHaz').style.display = ''; renderHaz(); renderLog(); refreshStations(); refreshStatus(); drawAll();
+}
+function checkCircles() {
+  if (!S.q) return; const out = S.st.map(s => { if (s.r == null) return s.id + ': no circle yet'; const diff = s.r - stDist(S.q, s); return s.id + ': ' + (Math.abs(diff) <= 8 ? '<span class="ok">✓ good</span>' : '<span class="bad">' + (diff > 0 ? 'too large' : 'too small') + '</span>'); });
+  say('Circle check: ' + out.join(' · ') + '. (A circle within 8 km counts as good.)');
+}
+const roman = I => ROMAN[Math.round(I)] + ' (' + damageWord(I) + ')';
+function renderHaz() {
+  const q = S.q, a = S.an; if (!a) return; let h = '<p class="msg"><b>Quake #' + q.n + '</b>: magnitude <b>' + q.M + '</b>, depth <b>' + q.depth + ' km</b>. The epicenter was <b>' + (a.offshore ? 'offshore</b> (sea floor ' + Math.round(-a.elev).toLocaleString() + ' m deep)' : 'on land</b> (elevation ' + Math.round(a.elev) + ' m, slope ' + a.grade.toFixed(0) + '%)') + '. Steep terrain (slope ≥ 15%) covers ' + Math.round(a.steepFrac * 100) + '% of the land within 15 km.</p>';
+  h += '<table><tr><th>Place</th><th class="n">Distance (km)</th><th>Ground</th><th class="n">Elev. (m)</th><th class="n">Slope</th><th>Shaking (MMI)</th></tr>';
+  a.towns.forEach(t => { h += '<tr><td><b>' + t.name + '</b></td><td class="n">' + t.r.toFixed(0) + '</td><td>' + t.ground + '</td><td class="n">' + Math.round(t.elev) + '</td><td class="n">' + t.grade.toFixed(0) + '%</td><td>' + roman(t.I) + '</td></tr>'; }); h += '</table>';
+  if (a.offshore) { h += '<p class="small" style="margin:8px 0 2px"><b>Ocean data for the coastal towns</b> (use speed = √(9.8 × depth) in m/s):</p><table><tr><th>Place</th><th class="n">Distance by sea (km)</th><th class="n">Average depth for the wave (m)</th></tr>'; a.towns.filter(t => t.tsu).forEach(t => { h += '<tr><td><b>' + t.name + '</b></td><td class="n">' + t.tsu.seaKm.toFixed(0) + '</td><td class="n">' + Math.round(t.tsu.avgDepth) + '</td></tr>'; }); h += '</table>'; }
+  h += '<div class="bar" style="margin-top:8px"><button id="sumBtn" type="button">' + (S.sum ? 'Hide' : 'Show') + ' the app’s hazard summary</button></div>';
+  if (S.sum) h += summaryHTML(q, a); $('hazBody').innerHTML = h; $('sumBtn').addEventListener('click', () => { S.sum = !S.sum; renderHaz(); });
+}
+function summaryHTML(q, a) {
+  let h = '<ul class="hz">'; const T = a.towns;
+  if (a.tsunami === 'none') h += '<li><b>Tsunami:</b> ' + (a.offshore ? 'not expected (the quake was too small or too deep to move much water).' : 'not a threat (the epicenter was on land).') + '</li>';
+  else { const list = T.filter(t => t.tsu).map(t => t.name + ' about ' + Math.round(t.tsu.minutes) + ' min' + (t.tsu.blocked ? ' (sheltered by a headland)' : '')).join('; '); h += '<li><b>Tsunami: ' + (a.tsunami === 'likely' ? 'likely' : 'small local waves possible') + '.</b> Shallow (' + q.depth + ' km), offshore, magnitude ' + q.M + '. Estimated arrival: ' + list + '.</li>'; }
+  const ls = T.filter(t => t.flags.some(f => /landslide/.test(f))); h += '<li><b>Landslides:</b> ' + (ls.length || a.landslideEpic ? (a.landslideEpic ? 'likely on the steep slopes near the epicenter. ' : '') + ls.map(t => t.name + ' (slope ' + t.grade.toFixed(0) + '%, shaking ' + ROMAN[Math.round(t.I)] + ')').join('; ') : 'no major threat to the six places.') + '</li>';
+  const lq = T.filter(t => t.flags.some(f => /liquefaction/.test(f))); h += '<li><b>Liquefaction:</b> ' + (lq.length ? lq.map(t => t.name + ' (' + t.ground + ', shaking ' + ROMAN[Math.round(t.I)] + ')').join('; ') : 'not expected.') + '</li>';
+  const dm = T.filter(t => t.I >= 5.5).sort((x, y) => y.I - x.I); h += '<li><b>Shaking damage:</b> ' + (dm.length ? dm.map(t => t.name + ' ' + ROMAN[Math.round(t.I)] + ' (' + damageWord(t.I) + ')').join('; ') : 'felt, but little or no damage.') + '</li></ul>'; return h;
+}
+function renderLog() {
+  if (!S.hist.length) { $('logBody').innerHTML = 'No earthquakes located yet.'; } else {
+    let h = '<table><tr><th class="n">Scn</th><th class="n">#</th><th class="n">M</th><th class="n">Depth (km)</th><th class="n">x (km)</th><th class="n">y (km)</th><th class="n">My error</th></tr>';
+    S.hist.forEach(r => { h += '<tr><td class="n">' + r.scn + '</td><td class="n">' + r.n + '</td><td class="n">' + r.M + '</td><td class="n"><span class="dot" style="background:' + DEPTH_COL(r.depth) + '"></span>' + r.depth + '</td><td class="n">' + r.x.toFixed(0) + '</td><td class="n">' + r.y.toFixed(0) + '</td><td class="n">' + (r.quick ? 'quick' : r.err == null ? '—' : r.err.toFixed(1) + ' km') + '</td></tr>'; }); $('logBody').innerHTML = h + '</table>';
+  }
+}
+// ---------- interaction ----------
+const ptr = e => { const r = mapC.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+function handlePos(s) { const c = toS(s.x, s.y), rp = s.r * zs(); const ha = handleAngle(s); return [c[0] + rp * Math.cos(ha), c[1] + rp * Math.sin(ha), c[0], c[1], rp]; }
+function hitTest(px, py) {
+  if (S.q) for (let i = 0; i < 3; i++) { const s = S.st[i]; if (s.r == null) continue; const h = handlePos(s); if (g2(px - h[0], py - h[1]) < 13) return { type: 'circle', i }; }
+  if (S.my) { const p = toS(S.my.x, S.my.y); if (g2(px - p[0], py - p[1]) < 15) return { type: 'my' }; }
+  for (let i = 0; i < 3; i++) { const p = toS(S.st[i].x, S.st[i].y); if (g2(px - p[0], py - (p[1] - 2)) < 16) return { type: 'station', i }; }
+  if (S.q) for (let i = 0; i < 3; i++) { const s = S.st[i]; if (s.r == null) continue; const h = handlePos(s); if (Math.abs(g2(px - h[2], py - h[3]) - h[4]) < 7) return { type: 'circle', i }; }
+  return null;
+}
+mapC.addEventListener('pointerdown', e => {
+  const [px, py] = ptr(e); if (px < ML || px > ML + MWp || py < MT || py > MT + MHp) return; let h = hitTest(px, py);
+  if (S.place && S.q && !S.revealed && !(h && h.type === 'my')) h = null;       // while placing, a click always drops the marker (even on a circle or a station)
+  if (h && h.type === 'station') { select(h.i); return; }
+  mapC.setPointerCapture && mapC.setPointerCapture(e.pointerId);
+  if (h && h.type === 'circle') { S.drag = { type: 'circle', i: h.i }; return; }
+  if (h && h.type === 'my') { S.drag = { type: 'my' }; return; }
+  if (S.place && S.q && !S.revealed) { const w = toW(px, py); S.my = { x: Math.max(0, Math.min(MW, w[0])), y: Math.max(0, Math.min(MH, w[1])) }; S.place = false; refreshStatus(); drawMap(); S.drag = { type: 'my' }; return; }
+  S.drag = { type: 'pan', px, py, x0: S.view.x0, y0: S.view.y0 };
+});
+mapC.addEventListener('pointermove', e => {
+  const [px, py] = ptr(e), d = S.drag;
+  if (d && d.type === 'circle') { const w = toW(px, py), s = S.st[d.i]; s.r = Math.max(1, Math.min(450, Math.round(g2(w[0] - s.x, w[1] - s.y)))); if (d.i === S.sel) $('dIn').value = s.r; drawMap(); return; }
+  if (d && d.type === 'my') { const w = toW(px, py); S.my = { x: Math.max(0, Math.min(MW, w[0])), y: Math.max(0, Math.min(MH, w[1])) }; drawMap(); return; }
+  if (d && d.type === 'pan') { const s = zs(); S.view.x0 = d.x0 - (px - d.px) / s; S.view.y0 = d.y0 + (py - d.py) / s; clampView(); drawMap(); return; }
+  if (px >= ML && px <= ML + MWp && py >= MT && py <= MT + MHp) { const w = toW(px, py), e0 = demAt(w[0], w[1]); $('mapinfo').textContent = 'x ' + w[0].toFixed(0) + ' km · y ' + w[1].toFixed(0) + ' km · ' + (e0 < 0 ? 'sea depth ' + Math.round(-e0).toLocaleString() + ' m' : 'elevation ' + Math.round(e0).toLocaleString() + ' m · slope ' + gradAt(w[0], w[1]).toFixed(0) + '%'); }
+});
+const endDrag = () => { S.drag = null; };
+mapC.addEventListener('dblclick', e => { if (!S.q || S.revealed) return; const [px, py] = ptr(e); if (px < ML || px > ML + MWp || py < MT || py > MT + MHp) return; const w = toW(px, py); S.my = { x: Math.max(0, Math.min(MW, w[0])), y: Math.max(0, Math.min(MH, w[1])) }; S.place = false; S.drag = null; say('Epicenter marker placed. Drag it to adjust, or press <b>Reveal the real epicenter</b>.'); refreshStatus(); drawMap(); });
+mapC.addEventListener('pointerup', endDrag); mapC.addEventListener('pointercancel', endDrag);
+mapC.addEventListener('wheel', e => { e.preventDefault(); const [px, py] = ptr(e); zoomAt(px, py, e.deltaY < 0 ? 1.25 : 0.8); }, { passive: false });
+$('zin').addEventListener('click', () => zoomAt(ML + MWp / 2, MT + MHp / 2, 1.4)); $('zout').addEventListener('click', () => zoomAt(ML + MWp / 2, MT + MHp / 2, 1 / 1.4)); $('zreset').addEventListener('click', () => { S.view = { z: 1, x0: 0, y0: 0 }; drawMap(); });
+seisC.addEventListener('pointermove', e => { S.seisHover = e.clientX - seisC.getBoundingClientRect().left; drawSeis(); }); seisC.addEventListener('pointerleave', () => { S.seisHover = null; drawSeis(); });
+gC.addEventListener('pointermove', e => { S.gHover = e.clientX - gC.getBoundingClientRect().left; drawGraph(); }); gC.addEventListener('pointerleave', () => { S.gHover = null; drawGraph(); });
+$('spIn').addEventListener('input', e => { S.st[S.sel].sp = e.target.value; verdict(); drawGraph(); });
+$('dIn').addEventListener('input', e => { const v = num(e.target.value); S.st[S.sel].r = v != null && v > 0 ? Math.min(450, v) : null; drawMap(); });
+$('cause').addEventListener('click', cause); $('reveal').addEventListener('click', () => reveal(false)); $('quick').addEventListener('click', () => reveal(true)); $('check').addEventListener('click', checkCircles);
+$('place').addEventListener('click', () => { S.place = !S.place; say(S.place ? 'Click the map where the three circles meet. You can drag the marker afterward. (Shortcut: double-click the map any time.)' : 'Placement canceled.'); refreshStatus(); });
+$('geo').addEventListener('click', () => { S.geo = !S.geo; refreshStatus(); drawMap(); });
+function resetAll() { S.n = 0; S.q = null; S.revealed = false; S.my = null; S.place = false; S.an = null; S.seis = null; S.sel = 0; S.st.forEach(s => { s.r = null; s.sp = ''; }); $('cardHaz').style.display = 'none'; say('Cause an earthquake to begin.'); refreshStations(); refreshStatus(); renderLog(); drawAll(); }
+function clearAll() { S.hist = []; S.geo = false; resetAll(); }
+$('loadScn').addEventListener('click', () => { const v = Math.max(1, Math.min(99, Math.round(num($('scn').value) || 1))); $('scn').value = v; S.scn = v; S.hist = S.hist.filter(h => h.scn !== v); resetAll(); wsOnScenario(); });
+let clearTimer = null;
+$('clearMap').addEventListener('click', () => { const b = $('clearMap'); if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; b.textContent = 'Clear all epicenters'; clearAll(); } else { b.textContent = 'Click again to confirm'; clearTimer = setTimeout(() => { clearTimer = null; b.textContent = 'Clear all epicenters'; }, 3500); } });
+$('oTimes').addEventListener('change', e => { S.opt.times = e.target.checked; refreshStations(); drawSeis(); }); $('oQuick').addEventListener('change', e => { S.opt.quick = e.target.checked; refreshStatus(); });
+$('oGeo').addEventListener('change', e => { S.opt.unlock = e.target.checked; refreshStatus(); }); $('oDist').addEventListener('change', e => { S.opt.dist = e.target.checked; drawGraph(); });
+$('oSum').addEventListener('change', e => { S.opt.autosum = e.target.checked; S.sum = e.target.checked && S.revealed; if (S.revealed) renderHaz(); });
+// ----- teacher settings: PIN lock and a settings token for the student link -----
+function pinHash(str, seed = 0) { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed; for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return 4294967296 * (2097151 & h2) + (h1 >>> 0); }
+const PIN_HASH = 8464899772994620;
+const CFG = [['oTimes', 'times'], ['oDist', 'dist'], ['oQuick', 'quick'], ['oGeo', 'unlock'], ['oSum', 'autosum']];
+function cfgToken() { return '#cfg' + CFG.map(([, k]) => S.opt[k] ? '1' : '0').join('') + S.opt.fb; }
+function showToken() { $('tToken').textContent = cfgToken(); }
+(function () { const C = window.LAB_CONFIG || {}; CFG.forEach(([id, k]) => { if (typeof C[k] === 'boolean') { S.opt[k] = C[k]; $(id).checked = C[k]; } }); if (C.feedback === 0 || C.feedback === 1 || C.feedback === 2) S.opt.fb = C.feedback;
+  const m = /^#cfg([01]{5})([012])?$/.exec(location.hash || ''); if (m) { CFG.forEach(([id, k], i) => { S.opt[k] = m[1][i] === '1'; $(id).checked = S.opt[k]; }); if (m[2]) S.opt.fb = +m[2]; } $('oFb').value = String(S.opt.fb); showToken(); })();
+CFG.forEach(([id]) => $(id).addEventListener('change', showToken));
+$('tOpen').addEventListener('click', () => { if ($('tBody').style.display !== 'none') return; $('tPin').style.display = ''; $('pinIn').focus(); });
+function tryPin() { if (pinHash('lab:' + $('pinIn').value) === PIN_HASH) { $('tPin').style.display = 'none'; $('tBody').style.display = ''; $('tOpen').textContent = '🔓 Teacher settings'; $('pinMsg').textContent = ''; $('pinIn').value = ''; } else { $('pinMsg').textContent = 'Incorrect PIN'; $('pinIn').select(); } }
+$('pinGo').addEventListener('click', tryPin); $('pinIn').addEventListener('keydown', e => { if (e.key === 'Enter') tryPin(); });
+$('tLockNow').addEventListener('click', () => { $('tBody').style.display = 'none'; $('tOpen').textContent = '🔒 Teacher settings'; });
+let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(layoutAll, 120); });
+$('legend').innerHTML = '<span><svg width="14" height="12" viewBox="0 0 14 12"><polygon points="7,1 1,11 13,11" fill="#2b6cb0"/></svg> station</span><span>★ real epicenter</span><span>✛ my epicenter</span><span><i class="dot" style="background:#d7191c"></i>0–20 km deep</span><span><i class="dot" style="background:#f28e2b"></i>20–40</span><span><i class="dot" style="background:#7b3294"></i>40–60</span><span><i class="dot" style="background:#1f4e9c"></i>60+ km</span><span>dot size = magnitude</span><span>blue contours = sea-floor depth</span>';
+if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawAll);
+layoutAll(); refreshStations(); refreshStatus(); say('Press <b>Cause an earthquake</b> to begin.');
+setTimeout(() => { try { topo = document.createElement('canvas'); renderTopo(topo, PX); } catch (err) { topo = null; } drawAll(); }, 30);
+// ===================== worksheet: answers, auto-scoring, and submitting to a Google Sheet =====================
+const CFG0 = window.LAB_CONFIG || {}, WS = { data: {}, id: { name: '', period: '' }, built: false, busy: false };
+const WS_WRITTEN = [['A2', 'A2: why not P alone?', 1, 'a2'], ['A3', 'A3: why three stations?', 1, 'a3'], ['C4', 'C4: Redhollow landslides', 2, 'c4'], ['C5', 'C5: liquefaction', 2, 'c5'], ['C6', 'C6: rank and mitigate', 2, 'c6'], ['D2', 'D2: pattern on the map', 2, 'd2'], ['D3', 'D3: depth trend (words)', 1, 'd3'], ['D4', 'D4: the two features', 2, 'd4'], ['D5', 'D5: tsunami and Fennmoor', 2, 'd5']];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const wsKey = () => 'eqlab:ws1:' + S.scn;
+function wsLoad() { try { WS.data = JSON.parse(localStorage.getItem(wsKey()) || '{}') || {}; } catch (e) { WS.data = {}; } try { Object.assign(WS.id, JSON.parse(localStorage.getItem('eqlab:id') || '{}')); } catch (e) {} }
+function wsSave() { try { localStorage.setItem(wsKey(), JSON.stringify(WS.data)); localStorage.setItem('eqlab:id', JSON.stringify(WS.id)); } catch (e) {} }
+const nI = (k, w) => '<input class="wn" data-k="' + k + '" type="number" step="any" style="width:' + (w || 74) + 'px">';
+const tI = (k, w) => '<input class="wt" data-k="' + k + '" type="text" style="width:' + w + 'px">';
+const tA = (k, rows) => '<textarea class="wa" data-k="' + k + '" rows="' + (rows || 3) + '"></textarea>';
+const ckb = (k, lab) => '<label class="wck"><input type="checkbox" data-k="' + k + '"> ' + lab + '</label>';
+const qL = (t, k, rows) => '<label class="wq">' + t + '</label>' + tA(k, rows);
+const HZ = [['tsu', 'tsunami'], ['land', 'landslides'], ['liq', 'liquefaction'], ['shake', 'shaking damage'], ['felt', 'felt only']];
+function wsHTML() {
+  const st = S.st; let h = '';
+  h += '<div class="card"><h2>Worksheet <span class="chip" id="wsScn"></span></h2><div class="row"><label>Your name ' + tI('id_name', 230) + '</label><label>Class period ' + tI('id_period', 70) + '</label></div><div class="small">Do the work on the <b>Lab</b> tab, then write your answers here. Your answers are saved on this device as you type. When you are done, press <b>Submit to my teacher</b> at the bottom. You can fix something and submit again.</div></div>';
+  h += '<div class="card"><h2>Part A: Practice with Quake #1 <span class="pts">(10 points)</span></h2><div class="scrollx"><table class="wst"><tr><th>Station</th><th>P arrival (s)</th><th>S arrival (s)</th><th>S − P (s)</th><th>Distance from the graph (km)</th></tr>';
+  st.forEach((s, i) => { h += '<tr><td><b>' + s.id + '</b> (' + s.code + ')</td><td>' + nI('a_p' + i) + '</td><td>' + nI('a_s' + i) + '</td><td>' + nI('a_sp' + i) + '</td><td>' + nI('a_d' + i) + '</td></tr>'; });
+  h += '</table></div><div class="row">A1. My epicenter estimate: x ' + nI('a_ex', 70) + ' km, y ' + nI('a_ey', 70) + ' km. Error after “Reveal”: ' + nI('a_err', 70) + ' km</div>' + qL('A2. Why can’t seismologists find the distance to an earthquake from the P arrival time alone?', 'a2', 2) + qL('A3. Why do you need three stations, not one or two?', 'a3', 2) + '</div>';
+  h += '<div class="card"><h2>Part B: Locate Quakes #2, #3, and #4 <span class="pts">(12 points)</span></h2><div class="scrollx"><table class="wst"><tr><th>Quake</th><th>S − P at A (s)</th><th>S − P at B (s)</th><th>S − P at C (s)</th><th>Dist. A (km)</th><th>Dist. B (km)</th><th>Dist. C (km)</th><th>My epicenter x</th><th>y</th><th>Error (km)</th></tr>';
+  [2, 3, 4].forEach(n => { h += '<tr><td><b>#' + n + '</b></td>' + [0, 1, 2].map(i => '<td>' + nI('b' + n + '_sp' + i, 62) + '</td>').join('') + [0, 1, 2].map(i => '<td>' + nI('b' + n + '_d' + i, 62) + '</td>').join('') + '<td>' + nI('b' + n + '_x', 62) + '</td><td>' + nI('b' + n + '_y', 62) + '</td><td>' + nI('b' + n + '_err', 62) + '</td></tr>'; });
+  h += '</table></div></div>';
+  h += '<div class="card"><h2>Part C: What Else Could Each Earthquake Cause? <span class="pts">(18 points)</span></h2><div class="small"><b>Hazard clues.</b> Tsunami: a large, shallow quake under the ocean. Landslides: steep slopes (crowded contours, slope 15% or more) and strong shaking. Liquefaction: loose, water-filled sediments. Shaking damage: depends on the shaking intensity (MMI) in each town.</div><div class="small">C1. Read the <b>Hazard briefing</b> after you reveal each quake.</div><div class="scrollx"><table class="wst"><tr><th>Quake</th><th>Magnitude</th><th>Depth (km)</th><th>On land or offshore?</th><th>Hazards that are possible</th><th>Evidence</th></tr>';
+  [1, 2, 3, 4].forEach(n => { h += '<tr><td><b>#' + n + '</b></td><td>' + nI('c1_' + n + '_M', 64) + '</td><td>' + nI('c1_' + n + '_z', 64) + '</td><td><select data-k="c1_' + n + '_loc"><option value="">choose…</option><option value="land">on land</option><option value="offshore">offshore</option></select></td><td>' + HZ.map(x => ckb('c1_' + n + '_h_' + x[0], x[1])).join('') + '</td><td>' + tI('c1_' + n + '_ev', 190) + '</td></tr>'; });
+  h += '</table></div><div class="row"><b>C2.</b> Quake #2 happened under the ocean. Coastal town closest to the epicenter: <select data-k="c2_town"><option value="">choose…</option><option value="PA">Port Alder</option><option value="MA">Marlow</option><option value="SA">Saltmere</option></select> Distance by sea ' + nI('c2_dist', 66) + ' km. Average depth for the wave ' + nI('c2_depth', 66) + ' m</div><div class="row">Wave speed = √(9.8 × depth) = ' + nI('c2_v', 66) + ' m/s = ' + nI('c2_vkm', 66) + ' km/min (multiply m/s by 0.06). Travel time = distance ÷ speed = ' + nI('c2_t', 66) + ' minutes.</div>';
+  h += '<div class="row"><b>C3.</b> A siren sounds 5 minutes after the earthquake. Minutes to reach high ground: ' + nI('c3', 66) + '</div>' + qL('C4. Quake #3: Redhollow and Port Alder both feel strong shaking, but Redhollow is far more likely to have landslides. Use the map (contour lines) and the slope column to explain why.', 'c4', 3) + qL('C5. Quake #4: Compare the ground under Fennmoor with the ground under Ironvale. Which town is more likely to see liquefaction, and why?', 'c5', 3);
+  h += '<div class="row"><b>C6.</b> Rank Quakes #1–#4 from most dangerous (1) to least dangerous (4): #1 ' + nI('c6_1', 50) + ' #2 ' + nI('c6_2', 50) + ' #3 ' + nI('c6_3', 50) + ' #4 ' + nI('c6_4', 50) + '</div>' + qL('Explain your top choice and name one action that could reduce the harm.', 'c6', 3) + '</div>';
+  h += '<div class="card"><h2>Part D: Discover the Hidden Geology <span class="pts">(10 points)</span></h2><div class="small">After you have located four quakes accurately, <b>Quick-plot</b> unlocks. Add quakes #5 through #14 and copy each one from the <b>Earthquake log</b>.</div><div class="scrollx"><table class="wst"><tr><th>Quake</th><th>x (km)</th><th>y (km)</th><th>Depth (km)</th><th>Magnitude</th></tr>';
+  for (let n = 5; n <= 14; n++) h += '<tr><td><b>#' + n + '</b></td><td>' + nI('d_' + n + '_x', 64) + '</td><td>' + nI('d_' + n + '_y', 64) + '</td><td>' + nI('d_' + n + '_z', 64) + '</td><td>' + nI('d_' + n + '_M', 64) + '</td></tr>';
+  h += '</table></div><div class="small"><b>D1 graph.</b> Click the grid to plot depth (down) against x (east) for all 14 quakes. Click a point again to remove it. <span id="plotN"></span> <button type="button" id="plotClear">Clear points</button></div><canvas id="dplot" class="wplot"></canvas>' + qL('D2. Describe the pattern of epicenters on the map. Where do they form a band or a line?', 'd2', 3);
+  h += '<div class="row"><b>D3.</b> For quakes west of x = 200 km, depth changes by about ' + nI('d3_slope', 70) + ' km of depth per km east (slope of your line of best fit).</div>' + qL('D3. In words: what happens to quake depth as you go east?', 'd3', 2) + qL('D4. Click <b>Reveal the geology</b>. Name the two features and tell which of your patterns each one explains.', 'd4', 3) + qL('D5. Which feature can cause tsunamis? Which feature is a bigger threat to Fennmoor? Explain.', 'd5', 3) + '</div>';
+  h += '<div class="card"><h2>Hand it in</h2><div class="row"><button type="button" id="wsSubmit" class="primary">Submit to my teacher</button><button type="button" id="wsBackup">Save a backup file</button><button type="button" id="wsClear">Clear my answers</button></div><div class="msg" id="wsMsg" aria-live="polite"></div><div id="wsReport"></div></div>';
+  return h;
+}
+function wsFill() {
+  $('wsScn').textContent = 'Scenario ' + S.scn;
+  document.querySelectorAll('#wsView [data-k]').forEach(el => { const k = el.dataset.k, v = k === 'id_name' ? WS.id.name : k === 'id_period' ? WS.id.period : WS.data[k]; if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : v; });
+}
+function wsOnInput(e) {
+  const el = e.target, k = el.dataset && el.dataset.k; if (!k) return; const v = el.type === 'checkbox' ? el.checked : el.value;
+  if (k === 'id_name') WS.id.name = v; else if (k === 'id_period') WS.id.period = v; else WS.data[k] = v;
+  const m = /^(c1_\d_h_)(\w+)$/.exec(k);
+  if (m && v) { document.querySelectorAll('#wsView [data-k^="' + m[1] + '"]').forEach(o => { const oh = o.dataset.k.slice(m[1].length); if (oh !== m[2] && ((m[2] === 'felt') || (oh === 'felt'))) { o.checked = false; WS.data[o.dataset.k] = false; } }); }
+  wsSave();
+}
+// ----- graph for D1 -----
+const PLM = { L: 46, T: 14, R: 12, B: 36, W: 640, H: 300 };
+function drawPlot() {
+  const c = $('dplot'); if (!c) return; const ctx = c.getContext('2d'), dp = window.devicePixelRatio || 1; c.style.width = '100%'; c.style.maxWidth = PLM.W + 'px'; c.style.height = 'auto'; c.width = Math.round(PLM.W * dp); c.height = Math.round(PLM.H * dp); ctx.setTransform(dp, 0, 0, dp, 0, 0);
+  const pw = PLM.W - PLM.L - PLM.R, ph = PLM.H - PLM.T - PLM.B, X = x => PLM.L + x / 300 * pw, Y = z => PLM.T + z / 100 * ph;
+  ctx.fillStyle = css('--card') || '#fff'; ctx.fillRect(0, 0, PLM.W, PLM.H);
+  for (let x = 0; x <= 300; x += 25) { ctx.strokeStyle = x % 50 === 0 ? 'rgba(90,100,150,.6)' : 'rgba(90,100,150,.28)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(x), PLM.T); ctx.lineTo(X(x), PLM.T + ph); ctx.stroke(); if (x % 50 === 0) txt(ctx, String(x), X(x), PLM.T + ph + 13, 11, css('--muted') || '#566089', 'center', 700, false); }
+  for (let z = 0; z <= 100; z += 10) { ctx.strokeStyle = z % 20 === 0 ? 'rgba(90,100,150,.6)' : 'rgba(90,100,150,.25)'; ctx.beginPath(); ctx.moveTo(PLM.L, Y(z)); ctx.lineTo(PLM.L + pw, Y(z)); ctx.stroke(); if (z % 20 === 0) txt(ctx, String(z), PLM.L - 6, Y(z), 11, css('--muted') || '#566089', 'right', 700, false); }
+  ctx.strokeStyle = css('--ink') || '#1b2a5e'; ctx.lineWidth = 1.4; ctx.strokeRect(PLM.L, PLM.T, pw, ph);
+  txt(ctx, 'x: km east on the map', PLM.L + pw / 2, PLM.H - 6, 11.5, css('--muted') || '#566089', 'center', 700, false); ctx.save(); ctx.translate(11, PLM.T + ph / 2); ctx.rotate(-Math.PI / 2); txt(ctx, 'depth (km)', 0, 0, 11.5, css('--muted') || '#566089', 'center', 700, false); ctx.restore();
+  const pts = Array.isArray(WS.data.d_plot) ? WS.data.d_plot : []; pts.forEach(p => { ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 5, 0, 7); ctx.fillStyle = '#c8553d'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#fff'; ctx.stroke(); });
+  const n = $('plotN'); if (n) n.textContent = pts.length + ' point' + (pts.length === 1 ? '' : 's') + ' plotted.';
+}
+function plotClick(e) {
+  const c = $('dplot'), r = c.getBoundingClientRect(), sx = PLM.W / r.width, px = (e.clientX - r.left) * sx, py = (e.clientY - r.top) * sx, pw = PLM.W - PLM.L - PLM.R, ph = PLM.H - PLM.T - PLM.B;
+  if (px < PLM.L - 4 || px > PLM.L + pw + 4 || py < PLM.T - 4 || py > PLM.T + ph + 4) return;
+  const pts = Array.isArray(WS.data.d_plot) ? WS.data.d_plot.slice() : []; let hit = -1;
+  pts.forEach((p, i) => { if (Math.hypot(PLM.L + p[0] / 300 * pw - px, PLM.T + p[1] / 100 * ph - py) < 9) hit = i; });
+  if (hit >= 0) pts.splice(hit, 1); else if (pts.length < 40) pts.push([Math.round(Math.max(0, Math.min(300, (px - PLM.L) / pw * 300)) * 10) / 10, Math.round(Math.max(0, Math.min(100, (py - PLM.T) / ph * 100)) * 10) / 10]);
+  WS.data.d_plot = pts; wsSave(); drawPlot();
+}
+// ----- auto-scoring -----
+function hazTruth(q) {
+  const a = analyze(q), req = new Set(), opt = new Set(), fl = a.towns.reduce((s, t) => s.concat(t.flags), []);
+  if (a.tsunami === 'likely') req.add('tsu'); else if (a.tsunami === 'small') opt.add('tsu');
+  if (a.landslideEpic || fl.indexOf('landslide') >= 0) req.add('land'); else if (fl.indexOf('landslide (possible)') >= 0) opt.add('land');
+  if (fl.indexOf('liquefaction') >= 0) req.add('liq'); else if (fl.indexOf('liquefaction (possible)') >= 0) opt.add('liq');
+  if (fl.indexOf('moderate damage') >= 0 || fl.indexOf('heavy damage') >= 0) req.add('shake'); else if (fl.indexOf('slight damage') >= 0) opt.add('shake');
+  return { req, opt, a };
+}
+function gradeWs() {
+  const d = WS.data, scn = S.scn, tol = S.opt.times ? 0.3 : 0.8, items = [];
+  const N = k => { const v = parseFloat(d[k]); return isNaN(v) ? null : v; }, near = (a, b, t) => a !== null && b !== null && Math.abs(a - b) <= t;
+  const add = (part, label, ok, max) => items.push({ part, label, max: max || 1, pts: ok ? (max || 1) : 0, ok: !!ok });
+  const q1 = quakeFor(scn, 1);
+  S.st.forEach((s, i) => { const a = arrivals(q1, s); add('A', 'Part A, station ' + s.id + ': P, S, and S − P', near(N('a_p' + i), a.tp, tol) && near(N('a_s' + i), a.ts, tol) && near(N('a_sp' + i), a.sp, tol)); add('A', 'Part A, station ' + s.id + ': distance', near(N('a_d' + i), a.d, 10)); });
+  const ex = N('a_ex'), ey = N('a_ey'), er = N('a_err'), have = ex !== null && ey !== null, de = have ? Math.hypot(ex - q1.x, ey - q1.y) : null;
+  add('A', 'A1: epicenter estimate within 15 km', have && de <= 15); add('A', 'A1: error recorded correctly', have && near(er, de, 3));
+  [2, 3, 4].forEach(n => { const q = quakeFor(scn, n), ar = S.st.map(s => arrivals(q, s)), bx = N('b' + n + '_x'), by = N('b' + n + '_y'), be = N('b' + n + '_err'), hv = bx !== null && by !== null, dd = hv ? Math.hypot(bx - q.x, by - q.y) : null;
+    add('B', 'Quake ' + n + ': the three S − P values', ar.every((a, i) => near(N('b' + n + '_sp' + i), a.sp, tol))); add('B', 'Quake ' + n + ': the three distances', ar.every((a, i) => near(N('b' + n + '_d' + i), a.d, 10)));
+    add('B', 'Quake ' + n + ': epicenter within 15 km', hv && dd <= 15); add('B', 'Quake ' + n + ': error recorded correctly', hv && near(be, dd, 3)); });
+  [1, 2, 3, 4].forEach(n => { const q = quakeFor(scn, n), H = hazTruth(q), k = 'c1_' + n + '_';
+    add('C', 'C1 quake ' + n + ': magnitude, depth, land or offshore', near(N(k + 'M'), q.M, 0.15) && near(N(k + 'z'), q.depth, 1.5) && d[k + 'loc'] === (H.a.offshore ? 'offshore' : 'land'));
+    const sel = ['tsu', 'land', 'liq', 'shake'].filter(h => d[k + 'h_' + h]), felt = !!d[k + 'h_felt'], R = Array.from(H.req);
+    add('C', 'C1 quake ' + n + ': hazards', felt ? (sel.length === 0 && R.length === 0) : (sel.length > 0 && R.every(h => sel.indexOf(h) >= 0) && sel.every(h => H.req.has(h) || H.opt.has(h)))); });
+  const a2 = analyze(quakeFor(scn, 2)), coast = a2.towns.filter(t => t.tsu).sort((x, y) => x.r - y.r), tt = coast[0] || null, cd = N('c2_dist'), cz = N('c2_depth'), cv = N('c2_v'), ckm = N('c2_vkm'), ct = N('c2_t');
+  add('C', 'C2: nearest town, distance, and depth', !!tt && d.c2_town === tt.id && near(cd, tt.tsu.seaKm, Math.max(5, 0.1 * tt.tsu.seaKm)) && near(cz, tt.tsu.avgDepth, Math.max(15, 0.1 * tt.tsu.avgDepth)));
+  const vc = cz !== null && cz > 0 ? Math.sqrt(9.8 * cz) : null; add('C', 'C2: wave speed', vc !== null && near(cv, vc, Math.max(1, 0.05 * vc)) && near(ckm, cv * 0.06, Math.max(0.1, 0.05 * cv * 0.06)));
+  const tc = cd !== null && cv !== null && cv > 0 ? cd * 1000 / cv / 60 : null; add('C', 'C2: travel time', tc !== null && near(ct, tc, Math.max(0.5, 0.05 * tc)));
+  add('C', 'C3: warning time', ct !== null && near(N('c3'), ct - 5, 0.6));
+  let rows = 0; for (let n = 5; n <= 14; n++) { const q = quakeFor(scn, n); if (near(N('d_' + n + '_x'), q.x, 3) && near(N('d_' + n + '_y'), q.y, 3) && near(N('d_' + n + '_z'), q.depth, 2) && near(N('d_' + n + '_M'), q.M, 0.15)) rows++; }
+  add('D', 'D1: the table of quakes 5–14', rows >= 8);
+  const pts = Array.isArray(d.d_plot) ? d.d_plot : [], used = pts.map(() => false); let hit = 0;
+  for (let n = 1; n <= 14; n++) { const q = quakeFor(scn, n); let bi = -1, bd = 1e9; pts.forEach((p, i) => { if (!used[i] && Math.abs(p[0] - q.x) <= 8 && Math.abs(p[1] - q.depth) <= 6) { const dd = g2(p[0] - q.x, (p[1] - q.depth) * 2); if (dd < bd) { bd = dd; bi = i; } } }); if (bi >= 0) { used[bi] = true; hit++; } }
+  add('D', 'D1: the graph (at least 10 of 14 points)', hit >= 10); add('D', 'D3: the slope number', near(N('d3_slope'), 0.5, 0.2));
+  const parts = {}; items.forEach(it => { const p = parts[it.part] || (parts[it.part] = [0, 0]); p[0] += it.pts; p[1] += it.max; });
+  const written = WS_WRITTEN.map(w => ({ id: w[0], label: w[1], max: w[2], answer: w[0] === 'C6' ? 'Ranks: #1 ' + (d.c6_1 || '?') + ', #2 ' + (d.c6_2 || '?') + ', #3 ' + (d.c6_3 || '?') + ', #4 ' + (d.c6_4 || '?') + '. ' + (d.c6 || '') : (d[w[3]] || '') }));
+  return { items, parts, total: items.reduce((s, i) => s + i.pts, 0), max: items.reduce((s, i) => s + i.max, 0), written, missed: items.filter(i => !i.ok).map(i => i.label) };
+}
+// ----- submit and backup -----
+function wsPayload(g) { const name = WS.id.name.trim(), period = WS.id.period.trim(); return { v: 1, code: CFG0.classCode || '', ts: new Date().toISOString(), name, period, scn: S.scn, auto: { total: g.total, max: g.max, parts: g.parts }, written: g.written, missed: g.missed, raw: Object.assign({ name, period, scn: S.scn }, WS.data) }; }
+function renderReport(g, sent) {
+  const el = $('wsReport'), fb = S.opt.fb; if (fb === 0) { el.innerHTML = sent ? '<p class="msg">Thank you. Your teacher will score your worksheet.</p>' : ''; return; }
+  let h = '<h3>Auto-scored so far: ' + g.total + ' of ' + g.max + '</h3><div class="small">Your 15 points of written answers are scored by your teacher.</div><table class="wst" style="margin-top:6px"><tr><th>Part</th><th>Points</th></tr>';
+  ['A', 'B', 'C', 'D'].forEach(p => { const v = g.parts[p]; h += '<tr><td>Part ' + p + '</td><td>' + v[0] + ' of ' + v[1] + '</td></tr>'; }); h += '</table>';
+  if (fb === 2) h += '<ul class="marks">' + g.items.map(i => '<li class="' + (i.ok ? 'ok' : 'bad') + '">' + (i.ok ? '✓' : '✗') + ' ' + esc(i.label) + '</li>').join('') + '</ul>';
+  el.innerHTML = h;
+}
+async function wsSubmit() {
+  const msg = $('wsMsg'), btn = $('wsSubmit'), name = WS.id.name.trim(), period = WS.id.period.trim();
+  if (!name || !period) { msg.innerHTML = '<span class="bad">Type your name and class period at the top first.</span>'; return; }
+  if (WS.busy) return; const g = gradeWs(), payload = wsPayload(g);
+  if (!CFG0.submitUrl) { msg.innerHTML = '<span class="bad">This copy of the app is not connected to a Google Sheet yet.</span> Press <b>Save a backup file</b> and give the file to your teacher.'; renderReport(g, false); return; }
+  WS.busy = true; btn.disabled = true; msg.textContent = 'Sending your worksheet…';
+  try {
+    let j = null;
+    try { const r = await fetch(CFG0.submitUrl, { method: 'POST', body: JSON.stringify(payload) }); j = await r.json(); }
+    catch (err) { await fetch(CFG0.submitUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) }); j = { ok: true, unconfirmed: true }; }
+    if (j && j.ok) { WS.data._sub = { at: Date.now(), attempts: j.attempts || null }; wsSave(); msg.innerHTML = j.unconfirmed ? '<span class="ok">Sent.</span> The sheet did not confirm that it arrived, so ask your teacher to check, or save a backup file too.' : '<span class="ok">Submitted ✓</span> at ' + new Date().toLocaleTimeString() + (j.attempts > 1 ? ' (attempt ' + j.attempts + ')' : '') + '. You can fix something and submit again.'; renderReport(g, true); }
+    else msg.innerHTML = '<span class="bad">Not sent: ' + esc((j && j.error) || 'unknown problem') + '.</span> ' + ((j && /code/.test(j.error || '')) ? 'Tell your teacher the class code does not match.' : 'Try again, or save a backup file.');
+  } catch (err) { msg.innerHTML = '<span class="bad">Could not reach the Google Sheet.</span> Check your internet connection and try again, or save a backup file.'; }
+  finally { WS.busy = false; btn.disabled = false; }
+}
+function wsBackup() {
+  const g = gradeWs(), blob = new Blob([JSON.stringify(wsPayload(g), null, 1)], { type: 'application/json' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'earthquake-lab-' + ((WS.id.name || 'student').replace(/[^A-Za-z0-9]+/g, '-')) + '-scenario-' + S.scn + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+let wsClearTimer = null;
+function wsBuild() {
+  if (WS.built) return; $('wsView').innerHTML = wsHTML(); WS.built = true;
+  $('wsView').addEventListener('input', wsOnInput); $('wsView').addEventListener('change', wsOnInput); $('dplot').addEventListener('pointerdown', plotClick);
+  $('plotClear').addEventListener('click', () => { WS.data.d_plot = []; wsSave(); drawPlot(); }); $('wsSubmit').addEventListener('click', wsSubmit); $('wsBackup').addEventListener('click', wsBackup);
+  $('wsClear').addEventListener('click', () => { const b = $('wsClear'); if (wsClearTimer) { clearTimeout(wsClearTimer); wsClearTimer = null; b.textContent = 'Clear my answers'; WS.data = {}; wsSave(); wsFill(); drawPlot(); $('wsMsg').textContent = ''; $('wsReport').innerHTML = ''; } else { b.textContent = 'Click again to erase this worksheet'; wsClearTimer = setTimeout(() => { wsClearTimer = null; b.textContent = 'Clear my answers'; }, 3500); } });
+}
+function showTab(which) {
+  const ws = which === 'ws'; $('labView').style.display = ws ? 'none' : ''; $('wsView').style.display = ws ? '' : 'none'; $('tabLab').classList.toggle('on', !ws); $('tabWs').classList.toggle('on', ws);
+  if (ws) { wsBuild(); wsFill(); drawPlot(); } else layoutAll();
+}
+function wsOnScenario() { wsLoad(); if (WS.built) { wsFill(); drawPlot(); $('wsMsg').textContent = ''; $('wsReport').innerHTML = ''; } }
+$('tabLab').addEventListener('click', () => showTab('lab')); $('tabWs').addEventListener('click', () => showTab('ws'));
+$('oFb').addEventListener('change', e => { S.opt.fb = +e.target.value; showToken(); });
+wsLoad();
+window.__ws = { WS, gradeWs, wsPayload, wsSubmit, wsOnScenario, showTab, wsBuild, wsFill, hazTruth };
+
+window.__lab = { S, cause, reveal, select, resetAll, drawAll, toS, toW, hitTest, renderHaz };
+})();
+
+</script>
+</body>
+</html>
